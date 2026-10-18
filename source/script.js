@@ -664,8 +664,10 @@ const io=("IntersectionObserver" in window)?new IntersectionObserver(es=>{es.for
 if(io) document.querySelectorAll("section.station").forEach(el=>io.observe(el));
 function showResume(){
   const w=store.get("lt.where",null), box=$("#resume"); if(!box) return;
-  const any=Object.keys(store.get("lt.prog",{})).length||(store.get("lt.stats",{d:{}}).d&&Object.keys(store.get("lt.stats",{d:{}}).d).length);
-  if(!any){box.hidden=true;return}
+  // only real practice counts (a repeated line, a meeting turn, a 4/3/2 round), not time spent looking around
+  const days=Object.values(store.get("lt.stats",{d:{}}).d||{});
+  const any=Object.keys(store.get("lt.prog",{})).length||days.some(e=>(e.l||0)+(e.t||0)+(e.r||0)>0);
+  if(!any||!w){box.hidden=true;return}
   const sec=SECS.find(x=>x[0]===w?.sec)||SECS[0];
   $("#resumeTxt").textContent=`Kaldığın yer: ${cur.title} · ${LEVELS[level].name} · ${sec[1]}`;
   $("#resumeBtn").onclick=()=>{const el=$("#st-"+sec[0]); el&&el.scrollIntoView({behavior:"smooth",block:"start"})};
