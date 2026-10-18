@@ -22,7 +22,7 @@ const SETTLED = 4;        // met on this many different days = settled
 const $ = s => document.querySelector(s);
 /* progress lives in memory + localStorage, and is mirrored to the viewer's private account record (see "account sync") */
 const MEM = {};
-const SYNC_KEYS = ["lt.cat","lt.scen","lt.level","lt.unlocked","lt.prog","lt.seen","lt.mine","lt.stats","lt.where","lt.done","lt.reach"];
+const SYNC_KEYS = ["lt.cat","lt.scen","lt.level","lt.unlocked","lt.prog","lt.seen","lt.mine","lt.stats","lt.where","lt.done","lt.reach","lt.howto"];
 const store = {
   get(k,d){if(k in MEM) return MEM[k]; try{const v=localStorage.getItem(k);return v?(MEM[k]=JSON.parse(v)):d}catch{return d}},
   put(k,v){MEM[k]=v; try{localStorage.setItem(k,JSON.stringify(v))}catch{}},
@@ -782,6 +782,7 @@ function applyRemote(d){
   cat=store.get("lt.cat","work"); cur=SCEN.find(s=>s.id===store.get("lt.scen"))||cur;
   unlocked=Math.min(3,Math.max(1,+store.get("lt.unlocked",1)||1)); level=Math.min(unlocked,+store.get("lt.level",1)||1);
   SEEN=store.get("lt.seen",{});
+  if(store.get("lt.howto",0)) $("#howto").hidden=true;
   ensureOpen(); loadAudio(cur.id); renderAll(); renderMemory(); renderMine(); if(cur.id!==prevScen) resetMeeting();
 }
 addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"&&ACC.ref){clearTimeout(ACC.timer);ACC.timer=null;pushSync()}});
@@ -910,4 +911,12 @@ function personalize(name){
   SCEN.forEach(walk); curName=name;
   try{ renderAll(); resetMeeting() }catch{}
 }
+/* first-visit guide: shown once per account (flag synced with progress), reopened from the account box */
+function howto(show){ $("#howto").hidden=!show; if(show) $("#howtoGo").focus() }
+function maybeHowto(){ const g=document.querySelector("#authGate"); if(!store.get("lt.howto",0)&&!(g&&!g.hidden)) howto(true) }
+$("#howtoBtn").onclick=()=>howto(true);
+$("#howtoGo").onclick=()=>{ howto(false); if(!store.get("lt.howto",0)) store.set("lt.howto",1) };
+$("#howto").onclick=e=>{ if(e.target.id==="howto") $("#howtoGo").click() };
+addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("#howto").hidden) $("#howtoGo").click() });
+if(!document.querySelector("#authGate")) setTimeout(maybeHowto,1500);   // with sign-in, the auth flow opens it after the gate
 ensureOpen(); loadAudio(cur.id); renderAll(); resetMeeting();

@@ -85,6 +85,18 @@ header{display:flex;flex-direction:column;gap:10px}
 .plan ol{margin:0 0 10px;padding-left:20px;font-size:.92rem}
 .plan ol li{margin:3px 0}
 .plan .kit{gap:5px}
+.howto-link{display:block;font-size:.78rem;margin-top:2px}
+.howto{position:fixed;inset:0;z-index:60;background:rgba(10,20,22,.55);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:28px 16px}
+.howto-card{background:var(--surface);color:var(--ink);border-radius:14px;max-width:760px;width:100%;padding:24px 26px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.howto-card h2{margin:0 0 4px;font-size:1.5rem}.howto-card .sub{color:var(--muted);margin:0 0 16px}
+.hsteps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hsteps li{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--bg)}
+.hsteps li.wide{grid-column:1/-1;background:var(--accent-soft);border-color:var(--accent)}
+.hsteps b{display:block;margin-bottom:3px}.hsteps .n{font-family:var(--f-mono,monospace);color:var(--accent);font-size:.8rem;margin-right:6px}
+.hsteps p{margin:0;font-size:.9rem;color:var(--muted);line-height:1.4}
+.htips{margin:14px 0 0;padding-left:18px;font-size:.88rem;color:var(--muted)}.htips li{margin:3px 0}
+.hfoot{display:flex;align-items:center;gap:14px;margin-top:18px;flex-wrap:wrap}.hfoot .muted{font-size:.8rem;flex:1}
+@media(max-width:560px){.hsteps{grid-template-columns:1fr}.howto-card{padding:20px 18px}}
 .scen.locked{opacity:.5;background:var(--bg);border-style:dashed}
 .cat.locked{opacity:.6}
 .lvl.locked{opacity:.6}
@@ -286,7 +298,7 @@ details summary{cursor:pointer;font-weight:700}
 <div class="wrap">
   <div class="acct" id="acct">
     <img id="accAvatar" alt="" hidden>
-    <div class="acc-who"><b id="accName">Laminate Talk</b><span class="acc-state" id="accState">Hesap kontrol ediliyor…</span></div>
+    <div class="acc-who"><b id="accName">Laminate Talk</b><span class="acc-state" id="accState">Hesap kontrol ediliyor…</span><button class="linkish howto-link" id="howtoBtn">Nasıl çalışılır?</button></div>
     <div class="acc-btns"><button id="loginBtn" hidden>Giriş yap / Üye ol</button><button id="logoutBtn" hidden>Çıkış yap</button></div>
     <details class="settings">
       <summary>İlerleme yedeği</summary>
@@ -297,6 +309,23 @@ details summary{cursor:pointer;font-weight:700}
     </details>
     <div class="resume" id="resume" hidden><span id="resumeTxt"></span><button class="primary" id="resumeBtn">Kaldığın yerden devam et</button></div>
   </div>
+  <div class="howto" id="howto" hidden role="dialog" aria-modal="true" aria-labelledby="howtoTitle"><div class="howto-card">
+    <h2 id="howtoTitle">Hoş geldin! Nasıl çalışılır?</h2>
+    <p class="sub">Kelime ezberi ve gramer yok. Günde 15-20 dakika, her konuda üç adım: dinle-tekrar et, anlat, konuş.</p>
+    <ol class="hsteps">
+      <li><b><span class="n">1</span>Konunu aç</b><p>Sıradaki konu kendiliğinden açık gelir. Konular sırayla açılır; sohbet konuları aralara serpiştirilmiştir.</p></li>
+      <li><b><span class="n">2</span>Dinle ve tekrar et</b><p>Her cümleyi ▶ ile dinle, aynı ritimle sesli tekrar et, "Söyledim"e bas. Tüm cümleler doğal hızın %77'sine gelince bu görev tamam.</p></li>
+      <li><b><span class="n">3</span>4/3/2 anlatım</b><p>Önce planı oku. Konuyu üç turda, kısalan sürelerle sesli anlat. Takılınca plandaki bir ifadeyi kullan ve durma.</p></li>
+      <li><b><span class="n">4</span>Toplantı</b><p>Karşındakinin sorularını kendi cümlelerinle cevapla. Takılırsan "İpucu"; her cevaptan sonra daha doğal halini görürsün.</p></li>
+      <li class="wide"><b><span class="n">✓</span>Konu tamamlanır, sıradaki açılır</b><p>Üç görev bitince kart ✓ olur ve sıradaki konu açılır. 63 konu bitince 2. seviye başlar: aynı konuların devam bölümleri, daha zor İngilizceyle.</p></li>
+    </ol>
+    <ul class="htips">
+      <li>Konuşarak cevap vermek için <b>Konuş</b> tuşu (Chrome ve Edge).</li>
+      <li>Unutmaya başladığın kelimeler, fark ettirmeden sonraki konulara geri gelir. Hangi kelimelerle karşılaştığını "Kelime hafızası"nda görürsün.</li>
+      <li>Ara verdiğinde üstteki <b>Kaldığın yerden devam et</b> seni aynı yere götürür. Bir bölüm sana kolay geliyorsa "Bu sekme kolay" ya da "Bu seviye kolay" ile atlayabilirsin.</li>
+    </ul>
+    <div class="hfoot"><button class="primary" id="howtoGo">Başlayalım</button><span class="muted">Bu rehberi sonra hesap kutusundaki "Nasıl çalışılır?" bağlantısından tekrar açabilirsin.</span></div>
+  </div></div>
   <header>
     <div class="plies" aria-hidden="true">
       <div class="ply p0"></div><div class="ply p45"></div><div class="ply pm45"></div><div class="ply p90"></div>
@@ -479,7 +508,7 @@ const SETTLED = 4;        // met on this many different days = settled
 const $ = s => document.querySelector(s);
 /* progress lives in memory + localStorage, and is mirrored to the viewer's private account record (see "account sync") */
 const MEM = {};
-const SYNC_KEYS = ["lt.cat","lt.scen","lt.level","lt.unlocked","lt.prog","lt.seen","lt.mine","lt.stats","lt.where","lt.done","lt.reach"];
+const SYNC_KEYS = ["lt.cat","lt.scen","lt.level","lt.unlocked","lt.prog","lt.seen","lt.mine","lt.stats","lt.where","lt.done","lt.reach","lt.howto"];
 const store = {
   get(k,d){if(k in MEM) return MEM[k]; try{const v=localStorage.getItem(k);return v?(MEM[k]=JSON.parse(v)):d}catch{return d}},
   put(k,v){MEM[k]=v; try{localStorage.setItem(k,JSON.stringify(v))}catch{}},
@@ -1237,6 +1266,7 @@ function applyRemote(d){
   cat=store.get("lt.cat","work"); cur=SCEN.find(s=>s.id===store.get("lt.scen"))||cur;
   unlocked=Math.min(3,Math.max(1,+store.get("lt.unlocked",1)||1)); level=Math.min(unlocked,+store.get("lt.level",1)||1);
   SEEN=store.get("lt.seen",{});
+  if(store.get("lt.howto",0)) $("#howto").hidden=true;
   ensureOpen(); loadAudio(cur.id); renderAll(); renderMemory(); renderMine(); if(cur.id!==prevScen) resetMeeting();
 }
 addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"&&ACC.ref){clearTimeout(ACC.timer);ACC.timer=null;pushSync()}});
@@ -1348,6 +1378,14 @@ function personalize(name){
   SCEN.forEach(walk); curName=name;
   try{ renderAll(); resetMeeting() }catch{}
 }
+/* first-visit guide: shown once per account (flag synced with progress), reopened from the account box */
+function howto(show){ $("#howto").hidden=!show; if(show) $("#howtoGo").focus() }
+function maybeHowto(){ const g=document.querySelector("#authGate"); if(!store.get("lt.howto",0)&&!(g&&!g.hidden)) howto(true) }
+$("#howtoBtn").onclick=()=>howto(true);
+$("#howtoGo").onclick=()=>{ howto(false); if(!store.get("lt.howto",0)) store.set("lt.howto",1) };
+$("#howto").onclick=e=>{ if(e.target.id==="howto") $("#howtoGo").click() };
+addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("#howto").hidden) $("#howtoGo").click() });
+if(!document.querySelector("#authGate")) setTimeout(maybeHowto,1500);   // with sign-in, the auth flow opens it after the gate
 ensureOpen(); loadAudio(cur.id); renderAll(); resetMeeting();
 /* ---------- membership (Supabase): sign up / sign in, progress kept in the member's account ---------- */
 const SB_URL="https://dkpdkzkmgazqlxscqvpq.supabase.co", SB_KEY="sb_publishable_h1K9E3rVED3lkM6U2KtQ3A_4Cq3BNHV";
@@ -1380,6 +1418,7 @@ async function signedIn(u){
     set:async d=>{const {error}=await sb.from("progress").upsert({user_id:u.id,data:d,updated_at:new Date().toISOString()}); if(error) throw error}
   };
   await pullSync(true);
+  maybeHowto();
 }
 async function pullSync(first){
   if(!ACC.ref) return;
@@ -1393,7 +1432,7 @@ async function pullSync(first){
   showResume();
 }
 async function sbInit(){
-  if(!SB_URL||SB_URL.startsWith("__")){ accState("İlerlemen bu cihazda kaydediliyor","ok"); $("#loginBtn").hidden=true; showResume(); return }
+  if(!SB_URL||SB_URL.startsWith("__")){ accState("İlerlemen bu cihazda kaydediliyor","ok"); $("#loginBtn").hidden=true; showResume(); maybeHowto(); return }
   try{ const {createClient}=await import(new URL("vendor/supabase.mjs",location.href).href);
     sb=createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}) }
   catch{ accState("Üyelik sistemine ulaşılamadı; ilerleme bu cihazda tutuluyor","warn"); showResume(); return }
@@ -1405,11 +1444,11 @@ async function sbInit(){
   if(session?.user) await signedIn(session.user);
   else { let guest=false; try{guest=localStorage.getItem("lt.guest")==="1"}catch{}
     $("#loginBtn").hidden=false; accState(guest?"Misafir olarak çalışıyorsun; ilerleme sadece bu cihazda":"Giriş yapılmadı");
-    if(!guest) gate(true,"in"); showResume() }
+    if(!guest) gate(true,"in"); else maybeHowto(); showResume() }
 }
 $("#tabIn").onclick=()=>authTab("in"); $("#tabUp").onclick=()=>authTab("up");
 $("#loginBtn").onclick=()=>gate(true,"in");
-$("#guestBtn").onclick=()=>{try{localStorage.setItem("lt.guest","1")}catch{} gate(false); accState("Misafir olarak çalışıyorsun; ilerleme sadece bu cihazda")};
+$("#guestBtn").onclick=()=>{try{localStorage.setItem("lt.guest","1")}catch{} gate(false); accState("Misafir olarak çalışıyorsun; ilerleme sadece bu cihazda"); maybeHowto()};
 $("#authForm").onsubmit=async e=>{
   e.preventDefault(); if(!sb) return;
   const t=$("#authGate").dataset.tab, email=$("#authEmail").value.trim(), pw=$("#authPw").value;

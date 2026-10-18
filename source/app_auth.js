@@ -29,6 +29,7 @@ async function signedIn(u){
     set:async d=>{const {error}=await sb.from("progress").upsert({user_id:u.id,data:d,updated_at:new Date().toISOString()}); if(error) throw error}
   };
   await pullSync(true);
+  maybeHowto();
 }
 async function pullSync(first){
   if(!ACC.ref) return;
@@ -42,7 +43,7 @@ async function pullSync(first){
   showResume();
 }
 async function sbInit(){
-  if(!SB_URL||SB_URL.startsWith("__")){ accState("İlerlemen bu cihazda kaydediliyor","ok"); $("#loginBtn").hidden=true; showResume(); return }
+  if(!SB_URL||SB_URL.startsWith("__")){ accState("İlerlemen bu cihazda kaydediliyor","ok"); $("#loginBtn").hidden=true; showResume(); maybeHowto(); return }
   try{ const {createClient}=await import(new URL("vendor/supabase.mjs",location.href).href);
     sb=createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}) }
   catch{ accState("Üyelik sistemine ulaşılamadı; ilerleme bu cihazda tutuluyor","warn"); showResume(); return }
@@ -54,11 +55,11 @@ async function sbInit(){
   if(session?.user) await signedIn(session.user);
   else { let guest=false; try{guest=localStorage.getItem("lt.guest")==="1"}catch{}
     $("#loginBtn").hidden=false; accState(guest?"Misafir olarak çalışıyorsun; ilerleme sadece bu cihazda":"Giriş yapılmadı");
-    if(!guest) gate(true,"in"); showResume() }
+    if(!guest) gate(true,"in"); else maybeHowto(); showResume() }
 }
 $("#tabIn").onclick=()=>authTab("in"); $("#tabUp").onclick=()=>authTab("up");
 $("#loginBtn").onclick=()=>gate(true,"in");
-$("#guestBtn").onclick=()=>{try{localStorage.setItem("lt.guest","1")}catch{} gate(false); accState("Misafir olarak çalışıyorsun; ilerleme sadece bu cihazda")};
+$("#guestBtn").onclick=()=>{try{localStorage.setItem("lt.guest","1")}catch{} gate(false); accState("Misafir olarak çalışıyorsun; ilerleme sadece bu cihazda"); maybeHowto()};
 $("#authForm").onsubmit=async e=>{
   e.preventDefault(); if(!sb) return;
   const t=$("#authGate").dataset.tab, email=$("#authEmail").value.trim(), pw=$("#authPw").value;
