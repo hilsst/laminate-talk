@@ -384,12 +384,32 @@ $("#hideText").onchange=applyHide;
 
 /* ---------- speech recognition (works only where the browser allows the microphone) ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const low=t=>t.toLowerCase().replace(/[^a-z0-9' ]/g,"");
+function mergeSeg(segs,t){const last=segs[segs.length-1];
+  if(last&&low(t).startsWith(low(last))) segs[segs.length-1]=t; else if(!(last&&low(last).startsWith(low(t)))) segs.push(t)}
+/* collapse immediately repeated word runs ("I'm a I'm a manufacturing" -> "I'm a manufacturing") */
+function dedupeRuns(text){
+  let w=text.split(/\s+/).filter(Boolean), changed=true;
+  while(changed){changed=false;
+    for(let n=4;n>=1&&!changed;n--) for(let i=0;i+2*n<=w.length;i++){
+      if(w.slice(i,i+n).map(low).join(" ")===w.slice(i+n,i+2*n).map(low).join(" ")){w.splice(i,n);changed=true;break}}}
+  // a run that is the start of the next run ("I'm a I'm a manufacturing engineer")
+  return w.join(" ");
+}
 function makeRec(onText,onEnd){
   if(!SR) return null;
   try{
     const r=new SR(); r.lang="en-US"; r.continuous=true; r.interimResults=true;
-    let finalTx="";
-    r.onresult=e=>{let interim="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)finalTx+=t+" ";else interim+=t}onText(finalTx,interim)};
+    // Chrome on Android repeats the growing phrase in every result ("I'm", "I'm a", "I'm a manufacturing"…),
+    // so the transcript is rebuilt from all results each time and a result that extends the previous one replaces it.
+    r.onresult=e=>{
+      const segs=[]; let interim="";
+      for(let i=0;i<e.results.length;i++){
+        const t=e.results[i][0].transcript.trim(); if(!t) continue;
+        if(e.results[i].isFinal) mergeSeg(segs,t); else interim=interim?interim+" "+t:t;
+      }
+      if(interim){const last=segs[segs.length-1]; if(last&&low(interim).startsWith(low(last))){segs.pop()} else if(last&&low(last).startsWith(low(interim))) interim=""}
+      const f=dedupeRuns(segs.join(" ")); onText(f?f+" ":"",interim)};
     r.onerror=e=>{onEnd&&onEnd(e.error)}; r.onend=()=>onEnd&&onEnd();
     return r;
   }catch{return null}
@@ -541,7 +561,7 @@ if(SR){$("#mic").hidden=false;
     const base=$("#say").value?($("#say").value+" "):"";
     chatRec=makeRec((f,i)=>{$("#say").value=base+(f+i).trim()},err=>{
       chatRec=null;$("#mic").textContent="Konuş";
-      if(err==="not-allowed"||err==="service-not-allowed"){$("#mic").hidden=true;$("#say").placeholder="Mikrofon bu sayfada kapalı. Kutuya tıkla, Windows'ta Win + H (Mac'te Fn iki kez) bas ve konuş."}
+      if(err==="not-allowed"||err==="service-not-allowed"){$("#mic").hidden=true;$("#say").placeholder="Mikrofona izin verilmedi. Tarayıcı ayarlarından mikrofon iznini aç ya da klavyenin mikrofon tuşuyla dikte et."}
     });
     if(!chatRec){$("#mic").hidden=true;return}
     try{chatRec.start();$("#mic").textContent="Dinliyor… bitir"}catch{chatRec=null}
