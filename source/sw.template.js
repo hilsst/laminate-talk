@@ -2,7 +2,7 @@
 const VER = "lt-__VER__";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png",
   "ort/ort.min.js", "ort/ort-wasm-simd.wasm", "tts/phonemizer.js", "tts/voice.json", "tts/voice0.wasm", "tts/voice1.wasm",
-  "audio/common.json"];
+  "audio/common.json", "vendor/supabase.mjs"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(VER).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
@@ -13,7 +13,7 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== "GET") return;
-  if (url.hostname === "api.anthropic.com") return;
+  if (url.hostname.endsWith("supabase.co")) return;
   const isPage = req.mode === "navigate" || (url.origin === location.origin && url.pathname.endsWith("/index.html"));
   if (isPage) {
     e.respondWith(fetch(req).then(r => { const c = r.clone(); caches.open(VER).then(x => x.put(req, c)); return r; })
