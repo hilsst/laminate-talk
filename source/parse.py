@@ -4,18 +4,24 @@ from lem import lemmas,OX
 def parse(files):
     scen=[]; s=None; lv=None
     for f in files:
+        # e*.txt files hold the episode rewrites of levels 2 and 3: a level header there replaces the older level
+        fresh=os.path.basename(f).startswith('e')
         for ln in open(f,encoding='utf8'):
             ln=ln.rstrip('\n')
             if not ln.strip(): continue
             if ln.startswith('## '):
                 p=[x.strip() for x in ln[3:].split('|')]
+                lv=None
                 if len(p)==1:
                     s=next(x for x in scen if x['id']==p[0]); continue
                 s={'id':p[0],'tag':p[1],'title':p[2],'group':p[3],'levels':{}}; scen.append(s)
-            elif ln.startswith('brief:'): s['brief']=ln[6:].strip()
-            elif ln.startswith('role:'): s['role']=ln[5:].strip()
+            elif ln[:6] in ('title:','brief:') or ln.startswith('role:'):
+                k,v=ln.split(':',1)
+                (lv if lv is not None else s)[k]=v.strip()   # inside a level: that episode's own title, situation and partner
             elif ln.startswith('### '):
-                lv=s['levels'].setdefault(ln[4:].strip(),{'chunks':[],'lines':[]})
+                k=ln[4:].strip()
+                if fresh: s['levels'][k]={'chunks':[],'lines':[]}
+                lv=s['levels'].setdefault(k,{'chunks':[],'lines':[]})
             elif ln.startswith('ideas:'):
                 lv['ideas']=[x.strip() for x in ln[6:].split(' ; ') if x.strip()]
             elif ln.startswith('chunks:'):
@@ -27,7 +33,7 @@ def parse(files):
             else: raise SystemExit('bad line in %s: %s'%(f,ln))
     return scen
 if __name__=='__main__':
-    files=sorted(glob.glob(os.path.dirname(os.path.abspath(__file__))+'/d*.txt'))+sorted(glob.glob(os.path.dirname(os.path.abspath(__file__))+'/i*.txt'))
+    files=sorted(glob.glob(os.path.dirname(os.path.abspath(__file__))+'/d*.txt'))+sorted(glob.glob(os.path.dirname(os.path.abspath(__file__))+'/i*.txt'))+sorted(glob.glob(os.path.dirname(os.path.abspath(__file__))+'/e*.txt'))
     S=parse(files)
     seen={}
     nlines=0

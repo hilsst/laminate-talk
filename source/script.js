@@ -33,6 +33,10 @@ let cur = SCEN.find(s=>s.id===store.get("lt.scen","standup")) || SCEN.find(s=>s.
 let unlocked = Math.min(3, Math.max(1, +store.get("lt.unlocked",1)||1));
 let level = Math.min(unlocked, +store.get("lt.level",1)||1);
 const L = () => cur.levels[level];
+// levels 2 and 3 are later episodes of the topic's story, each with its own title, situation and partner
+const eT = (x,lv=level) => x.levels[lv]?.title || x.title;
+const bf = () => L().brief || cur.brief;
+const rl = () => L().role || cur.role;
 const clean = t => t.replace(/…/g,"").trim();
 const opener = () => (L().lines.find(x=>x.s==="t")||{en:"Shall we start?"}).en;
 
@@ -268,7 +272,7 @@ function afterProgress(){
   if(topicDone(cur,level)&&!afterProgress.seen.has(tkey(cur,level))){
     afterProgress.seen.add(tkey(cur,level));
     const nx=PATH.find(x=>!topicDone(x,level));
-    const b=$("#banner"); b.textContent=nx?`"${cur.title}" tamamlandı. Sıradaki konu açıldı: ${nx.title}.`:`Bu seviyedeki tüm konular tamamlandı.`; b.hidden=false; setTimeout(()=>{b.hidden=true},9000);
+    const b=$("#banner"); b.textContent=nx?`"${eT(cur)}" tamamlandı. Sıradaki konu açıldı: ${eT(nx)}.`:`Bu seviyedeki tüm konular tamamlandı.`; b.hidden=false; setTimeout(()=>{b.hidden=true},9000);
   }
   if(level===unlocked&&unlocked<3&&doneCount(level)===PATH.length) setTimeout(unlockNext,900);
 }
@@ -328,8 +332,8 @@ function renderScenList(){
     const open=isOpen(s,level), done=topicDone(s,level);
     const b=document.createElement("button"); b.className="scen"+(open?"":" locked"); b.id="scen-"+s.id;
     b.setAttribute("aria-pressed", s===cur);
-    const tag=document.createElement("span"); tag.className="tag"; tag.textContent=(s.cat==="social"&&cat!=="social"?"SOHBET · ":"")+s.tag;
-    const st=document.createElement("strong"); st.textContent=(open?"":"🔒 ")+s.title;
+    const tag=document.createElement("span"); tag.className="tag"; tag.textContent=(s.cat==="social"&&cat!=="social"?"SOHBET · ":"")+s.tag+(level>1&&s.levels[level]?.title?` · ${level}. BÖLÜM`:"");
+    const st=document.createElement("strong"); st.textContent=(open?"":"🔒 ")+eT(s);
     b.append(tag,st);
     if(open){const t=tasks(s,level), d=document.createElement("div"); d.className="tasks";
       [["Diyalog",t.d],["4/3/2",t.r],["Toplantı",t.m]].forEach(([n,o])=>{const x=document.createElement("span");x.className=o?"ok":"";x.textContent=(o?"✓ ":"○ ")+n;d.append(x)}); b.append(d)}
@@ -337,13 +341,13 @@ function renderScenList(){
     else if(open&&s===cur){const m=document.createElement("span");m.className="badge";m.textContent="Şu an burada";b.append(m)}
     else if(open){const m=document.createElement("span");m.className="badge";m.textContent="Açık";b.append(m)}
     b.onclick=()=>{
-      if(!open){lockNote(`🔒 "${s.title}" henüz kilitli. Önce "${nx.title}" konusunu bitir: ${joinTr(missing(nx,level))} eksik.`);return}
+      if(!open){lockNote(`🔒 "${eT(s)}" henüz kilitli. Önce "${eT(nx)}" konusunu bitir: ${joinTr(missing(nx,level))} eksik.`);return}
       $("#lockMsg").hidden=true; goTopic(s); $("#brief").scrollIntoView({behavior:"smooth",block:"start"})};
     row.append(b);
   });
   const n=$("#suggest"); n.textContent=""; n.hidden=allDone;
   if(!allDone){const a=document.createElement("button"); a.className="linkish";
-    a.textContent=nx===cur?`Şu anki konu: ${nx.title} · eksik: ${joinTr(missing(nx,level))}`:`Sıradaki konu: ${nx.title} · eksik: ${joinTr(missing(nx,level))}`;
+    a.textContent=nx===cur?`Şu anki konu: ${eT(nx)} · eksik: ${joinTr(missing(nx,level))}`:`Sıradaki konu: ${eT(nx)} · eksik: ${joinTr(missing(nx,level))}`;
     a.onclick=()=>{cat=STAGE_OF[nx.id];store.set("lt.cat",cat);goTopic(nx);$("#brief").scrollIntoView({behavior:"smooth",block:"start"})};
     n.append(a)}
   // "this tab is easy": opens the next tab at this level without finishing the current one
@@ -355,7 +359,7 @@ function renderScenList(){
     const b=$("#banner"); b.textContent=`${CATS.find(c=>c[0]===nextStage)[1]} sekmesi açıldı.`; b.hidden=false; setTimeout(()=>{b.hidden=true},6000)};
 }
 function renderBrief(){
-  $("#briefTxt").textContent=cur.brief; $("#briefRole").textContent=cur.role;
+  $("#briefTxt").textContent=bf(); $("#briefRole").textContent=rl();
   const kit=$("#kit"); kit.innerHTML="";
   L().chunks.forEach(([en,tr])=>{
     const c=document.createElement("button"); c.className="chunk";
@@ -389,7 +393,7 @@ function renderPlan(){
   const step=(title,hint,kit,extra)=>{const d=document.createElement("div");d.className="step";
     const h=document.createElement("h3");h.textContent=title;const p=document.createElement("p");p.className="hint";p.textContent=hint;
     d.append(h,p);if(extra)d.append(extra);d.append(planKit(kit));box.append(d)};
-  step("1 · Başla","Konuyu ve ana mesajı tek cümleyle söyle. Konu: "+cur.title+".",F.open);
+  step("1 · Başla","Konuyu ve ana mesajı tek cümleyle söyle. Konu: "+eT(cur)+".",F.open);
   const ol=document.createElement("ol"); ideas.forEach(t=>{const li=document.createElement("li");li.textContent=t;ol.append(li)});
   step("2 · Sırayla anlat","Bu noktaları sırayla, kendi İngilizcenle anlat. Bağlayıcılar ve konu ifadeleri aşağıda.",[...F.go,...L().chunks],ol);
   step("3 · Bitir","Özetle ve sıradaki adımı söyle.",F.close);
@@ -571,8 +575,8 @@ let turns=[], ctl=null;
 function rules(){
   return `You are role-playing in an English speaking-practice app for a Turkish mechanical engineer who is an expert in composite materials (analysis, calculations, manufacturing). The goal is spoken fluency in work meetings, without grammar lessons.
 
-Scenario (the learner's brief, in Turkish): ${cur.brief}
-You play: ${cur.role}.
+Scenario (the learner's brief, in Turkish): ${bf()}
+You play: ${rl()}.
 
 Learner level ${level} of 3 (${LEVELS[level].name}). Language style: ${LEVELS[level].style}
 
@@ -661,7 +665,7 @@ $("#txFeedback").onclick=async()=>{
   const due=dueWords(5).map(i=>OX[i]);
   try{
     const r=await sample.json(`A Turkish composite-materials engineer just explained this topic aloud in English during a timed fluency drill:
-"${cur.brief}"
+"${bf()}"
 
 Learner level ${level} of 3 (${LEVELS[level].name}). Style for the rewrite: ${LEVELS[level].style}
 
@@ -693,7 +697,7 @@ $("#rescueBtn").onclick=async()=>{
   if(!sample){out.textContent="Sözlükte bulunamadı. Toplantı partneri açıkken daha geniş arama yapılabilir.";return}
   out.innerHTML='<p class="muted">Aranıyor…</p>';
   try{
-    const r=await sample.json(`A Turkish composite-materials engineer is speaking English (topic: ${cur.title}, ${cur.tag}) and can't recall how to say: "${q}" (Turkish word or a description).
+    const r=await sample.json(`A Turkish composite-materials engineer is speaking English (topic: ${eT(cur)}, ${cur.tag}) and can't recall how to say: "${q}" (Turkish word or a description).
 Return only JSON: {"en": "the natural English word or phrase a fluent speaker would actually say", "example": "one short spoken sentence using it in this context", "alt": "optional: a simpler way around it if the word still doesn't come, starting with 'Kurtarma yolu:' in Turkish, then the English workaround"}`,{modelTier:"quick"});
     show(String(r?.en||q),String(r?.example||""),r?.alt?String(r.alt):"");
   }catch(e){out.textContent=errCopy(e)}
@@ -753,7 +757,7 @@ function showResume(){
   const any=Object.keys(store.get("lt.prog",{})).length||days.some(e=>(e.l||0)+(e.t||0)+(e.r||0)>0);
   if(!any||!w){box.hidden=true;return}
   const sec=SECS.find(x=>x[0]===w?.sec)||SECS[0];
-  $("#resumeTxt").textContent=`Kaldığın yer: ${cur.title} · ${LEVELS[level].name} · ${sec[1]}`;
+  $("#resumeTxt").textContent=`Kaldığın yer: ${eT(cur)} · ${LEVELS[level].name} · ${sec[1]}`;
   $("#resumeBtn").onclick=()=>{const el=$("#st-"+sec[0]); el&&el.scrollIntoView({behavior:"smooth",block:"start"})};
   box.hidden=false;
 }
@@ -872,8 +876,8 @@ function voicePrompt(){
   const words=targets.slice(0,10).map(i=>OX[i]).join(", ");
   return `Let's do an English speaking practice in voice mode. I am a Turkish mechanical engineer who specialises in composite materials; I want to become fluent in work meetings without grammar lessons.
 
-Role-play this situation with me. Situation (in Turkish): ${cur.brief}
-You play: ${cur.role}.
+Role-play this situation with me. Situation (in Turkish): ${bf()}
+You play: ${rl()}.
 My level: ${LEVELS[level].name}. ${LEVELS[level].style}
 
 Rules:

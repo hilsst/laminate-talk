@@ -32,3 +32,29 @@ The learner retells the topic alone as a short talk (like briefing a meeting). `
 
 ## Validate
 Run `python3 parse.py` in the folder; it must print without errors. It parses all d*.txt and i*.txt files.
+
+## Episode rewrite of levels 2 and 3 (e*.txt files)
+Kemal approved: levels 2 and 3 of every topic become the NEXT EPISODES of the same story instead of a richer retelling of level 1.
+- Level 1 stays as it is (read it, it is the starting point of the story).
+- Level 2 = what happens next: a new situation in the same storyline, usually with a different counterpart or a role flip (e.g. Kemal now asks instead of answers, talks to a supplier/customer/manager instead of a colleague). New facts, but the same domain so earlier words come back.
+- Level 3 = a later, higher-stakes step: persuading, negotiating, handling pushback, presenting to management or a customer, defending a decision, giving an opinion with nuance.
+- Social topics: same theme, new angle (e.g. coffee: L1 weekend plans → L2 recommending places in Kemal's city to a foreign visitor → L3 debating work-life balance).
+- Each episode has its own Turkish title (short, e.g. "Tedarikçiyle kök neden toplantısı"), its own brief (Turkish, 1-2 sentences, what happens and what Kemal must do) and its own role (English, "a ..." lowercase).
+- Language difficulty rules for level 2 (Orta) and level 3 (İleri) stay exactly as above. ideas: 5 prompts for level 2, 5-6 for level 3.
+- File format (header holds only the id; title/brief/role go INSIDE each level):
+```
+## <id>
+### 2
+title: <Turkish episode title>
+brief: <Turkish>
+role: <English>
+ideas: ... ; ... ; ... ; ... ; ...
+chunks: <en> = <tr> ; ... (exactly 5)
+T: <English> | <Turkish>
+Y: <English> | <Turkish>
+... exactly 8 lines T,Y,T,Y,T,Y,T,Y
+### 3
+title: ...
+... same fields
+```
+- Validate your file with: python3 check_e.py <yourfile> <id> <id> ...   (must print OK), then python3 parse.py (must run without error).
