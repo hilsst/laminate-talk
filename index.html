@@ -84,7 +84,19 @@ header{display:flex;flex-direction:column;gap:10px}
 .plan .hint{color:var(--muted);font-size:.85rem;margin:0 0 8px}
 .plan ol{margin:0 0 10px;padding-left:20px;font-size:.92rem}
 .plan ol li{margin:3px 0}
-.plan .kit{gap:6px}
+.plan .kit{gap:5px}
+/* compact cue cards: Turkish hint on the same line so the whole plan fits on one screen while speaking */
+.plan .step{padding:10px 12px}
+.plan .hint{font-size:.8rem;margin:0 0 6px}
+.plan ol{font-size:.88rem;margin:0 0 8px}.plan ol li{margin:1px 0}
+.plan .chunk{padding:2px 9px;min-height:0;font-size:.84rem;border-radius:8px;line-height:1.35}
+.plan .chunk small{display:inline;margin-left:6px;font-size:.72rem}
+.roundbar{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:14px;background:var(--ink);color:var(--bg);border-radius:999px;padding:8px 10px 8px 20px;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:calc(100% - 32px)}
+.roundbar .rb-clock{font-family:var(--f-mono,monospace);font-size:1.4rem;font-variant-numeric:tabular-nums;font-weight:700}
+.roundbar>*{white-space:nowrap;flex:none}.roundbar #rbLive{flex:1 1 auto;min-width:0}
+@media (max-width:560px){.roundbar #rbLive{display:none}}
+.roundbar button{background:var(--bg);color:var(--ink);border:0;border-radius:999px;min-height:36px;padding:4px 14px}
+.roundbar #rbLive{font-size:.8rem;opacity:.8;max-width:38vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:rtl;text-align:left}
 @media (max-width:760px){.plan{grid-template-columns:1fr}}
 .acct{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
 .acct img{width:32px;height:32px;border-radius:50%;flex:none}
@@ -332,6 +344,7 @@ details summary{cursor:pointer;font-weight:700}
     <div class="st-head"><span class="st-num">02</span><h2>4/3/2 anlatım</h2></div>
     <p class="why">Yukarıda seçtiğin konuyu, toplantıda birine anlatıyormuş gibi kendi cümlelerinle sesli anlat. Önce aşağıdaki planı bir kez oku: nasıl başlayacağın, hangi sırayla anlatacağın ve nasıl bitireceğin orada. Sonra "1. turu başlat"a bas ve süre bitene kadar konuş. Aynı şeyi 2. turda daha kısa sürede, 3. turda daha da kısa sürede tekrar anlat. Takıldığın yerde durma; plandaki bir ifadeyi kullanıp devam et. Son turdan sonra söylediklerini aşağıya dikte et; Claude daha doğal halini gösterir.</p>
     <div class="plan" id="plan"></div>
+    <div class="roundbar" id="roundBar" hidden aria-live="polite"><span id="rbLabel"></span><span class="rb-clock" id="rbClock"></span><span id="rbLive"></span><button id="rbStop">Turu bitir</button></div>
     <div class="timer">
       <div class="dial" aria-live="polite">
         <svg viewBox="0 0 100 100" aria-hidden="true">
@@ -897,14 +910,19 @@ $("#startRound").onclick=()=>{
   const d=durations(); total=remain=d[roundIdx];
   // each round's speech is written live into the box, replacing the previous round's text
   $("#startRound").disabled=true; $("#liveTx").textContent=""; $("#liveTx").hidden=true; $("#txBox").value=""; $("#txOut").innerHTML="";
-  rec=makeRec((f,i)=>{const b=$("#txBox"); b.value=(f+i).trim(); b.scrollTop=b.scrollHeight}, ()=>{});
+  rec=makeRec((f,i)=>{const b=$("#txBox"); b.value=(f+i).trim(); b.scrollTop=b.scrollHeight; $("#rbLive").textContent=b.value.slice(-60)}, ()=>{});
+  // while speaking, the plan fills the screen and a small floating bar carries the clock
+  $("#rbLabel").textContent=(roundIdx+1)+". tur"; $("#rbClock").textContent=fmt(remain); $("#rbLive").textContent=""; $("#roundBar").hidden=false;
+  $("#plan").scrollIntoView({behavior:"smooth",block:"start"});
   try{rec&&rec.start()}catch{rec=null}
-  timer=setInterval(()=>{remain--; $("#clock").textContent=fmt(Math.max(remain,0));
+  timer=setInterval(()=>{remain--; $("#clock").textContent=fmt(Math.max(remain,0)); $("#rbClock").textContent=fmt(Math.max(remain,0));
     $("#arc").style.strokeDashoffset=C*(1-remain/total);
-    if(remain<=0){stopRound();roundIdx++;renderRounds();beep();statAdd("r",1)}
+    if(remain<=0) finishRound()
   },1000);
 };
-function stopRound(){clearInterval(timer);timer=null;try{rec&&rec.stop()}catch{}rec=null}
+function stopRound(){clearInterval(timer);timer=null;try{rec&&rec.stop()}catch{}rec=null;$("#roundBar").hidden=true}
+function finishRound(){stopRound();roundIdx++;renderRounds();beep();statAdd("r",1);$(".timer").scrollIntoView({behavior:"smooth",block:"center"})}
+$("#rbStop").onclick=finishRound;
 $("#resetRounds").onclick=()=>{stopRound();roundIdx=0;renderRounds()};
 function beep(){try{const a=new AudioContext(),o=a.createOscillator(),g=a.createGain();o.frequency.value=660;g.gain.value=.08;o.connect(g).connect(a.destination);o.start();o.stop(a.currentTime+.25)}catch{}}
 

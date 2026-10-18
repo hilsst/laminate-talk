@@ -464,14 +464,19 @@ $("#startRound").onclick=()=>{
   const d=durations(); total=remain=d[roundIdx];
   // each round's speech is written live into the box, replacing the previous round's text
   $("#startRound").disabled=true; $("#liveTx").textContent=""; $("#liveTx").hidden=true; $("#txBox").value=""; $("#txOut").innerHTML="";
-  rec=makeRec((f,i)=>{const b=$("#txBox"); b.value=(f+i).trim(); b.scrollTop=b.scrollHeight}, ()=>{});
+  rec=makeRec((f,i)=>{const b=$("#txBox"); b.value=(f+i).trim(); b.scrollTop=b.scrollHeight; $("#rbLive").textContent=b.value.slice(-60)}, ()=>{});
+  // while speaking, the plan fills the screen and a small floating bar carries the clock
+  $("#rbLabel").textContent=(roundIdx+1)+". tur"; $("#rbClock").textContent=fmt(remain); $("#rbLive").textContent=""; $("#roundBar").hidden=false;
+  $("#plan").scrollIntoView({behavior:"smooth",block:"start"});
   try{rec&&rec.start()}catch{rec=null}
-  timer=setInterval(()=>{remain--; $("#clock").textContent=fmt(Math.max(remain,0));
+  timer=setInterval(()=>{remain--; $("#clock").textContent=fmt(Math.max(remain,0)); $("#rbClock").textContent=fmt(Math.max(remain,0));
     $("#arc").style.strokeDashoffset=C*(1-remain/total);
-    if(remain<=0){stopRound();roundIdx++;renderRounds();beep();statAdd("r",1)}
+    if(remain<=0) finishRound()
   },1000);
 };
-function stopRound(){clearInterval(timer);timer=null;try{rec&&rec.stop()}catch{}rec=null}
+function stopRound(){clearInterval(timer);timer=null;try{rec&&rec.stop()}catch{}rec=null;$("#roundBar").hidden=true}
+function finishRound(){stopRound();roundIdx++;renderRounds();beep();statAdd("r",1);$(".timer").scrollIntoView({behavior:"smooth",block:"center"})}
+$("#rbStop").onclick=finishRound;
 $("#resetRounds").onclick=()=>{stopRound();roundIdx=0;renderRounds()};
 function beep(){try{const a=new AudioContext(),o=a.createOscillator(),g=a.createGain();o.frequency.value=660;g.gain.value=.08;o.connect(g).connect(a.destination);o.start();o.stop(a.currentTime+.25)}catch{}}
 
