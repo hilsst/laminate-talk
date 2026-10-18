@@ -1,5 +1,6 @@
 const SCEN = __CONTENT__;
 const OX = __OXFORD__;
+const OXTR = __OXTR__;   // Turkish gloss per Oxford word, same order as OX
 
 /* Offline glossary for the word rescue when Claude is unavailable */
 const GLOSS = __GLOSS__;
@@ -76,7 +77,37 @@ function renderMemory(){
   $("#memMet").textContent=met; $("#memSettled").textContent=settled;
   $("#memBarMet").style.width=(met/OX.length*100)+"%"; $("#memBarSettled").style.width=(settled/OX.length*100)+"%";
   $("#memDue").textContent=dueWords(999).length;
+  if(memOpen) renderMemList();
 }
+/* tapping a figure lists its words with the Turkish meaning and a sentence from the dialogues */
+let memOpen=null, EXAMPLE=null;
+function exampleFor(i){
+  if(!EXAMPLE){EXAMPLE={}; SCEN.forEach(s=>Object.values(s.levels).forEach(l=>l.lines.forEach(x=>(x.w||[]).forEach(w=>{if(!(w in EXAMPLE)) EXAMPLE[w]=x.en}))))}
+  return EXAMPLE[i]||"";
+}
+function renderMemList(){
+  const box=$("#memList"), d=today();
+  document.querySelectorAll(".mem-fig").forEach(b=>b.setAttribute("aria-expanded",String(b.dataset.k===memOpen)));
+  if(!memOpen){box.hidden=true;return}
+  let ids=Object.keys(SEEN).map(Number), title;
+  if(memOpen==="met"){ids.sort((a,b)=>SEEN[b][1]-SEEN[a][1]||SEEN[b][0]-SEEN[a][0]); title="Karşılaştığın kelimeler (en son görülen önce)"}
+  else if(memOpen==="settled"){ids=ids.filter(i=>SEEN[i][0]>=SETTLED).sort((a,b)=>OX[a].localeCompare(OX[b])); title="Pekişen kelimeler"}
+  else {ids=dueWords(9999); title="Tekrar zamanı gelen kelimeler (en çok bekleyen önce)"}
+  const ago=n=>n===0?"bugün":n===1?"dün":n+" gün önce";
+  box.innerHTML=`<div class="mem-list-head"><b>${title}</b><span class="muted">${ids.length} kelime</span><button class="mini" id="memClose">Kapat</button></div>`;
+  if(!ids.length){box.insertAdjacentHTML("beforeend",`<p class="muted">${memOpen==="due"?"Şu an tekrar zamanı gelen kelime yok.":memOpen==="settled"?"Henüz pekişen kelime yok. Bir kelime farklı günlerde 4 kez karşına çıkınca buraya gelir.":"Henüz kelime yok. Bir diyalog dinleyince burası dolmaya başlar."}</p>`)}
+  const ul=document.createElement("ul"); ul.className="mem-words";
+  ids.slice(0,400).forEach(i=>{const e=SEEN[i]; const li=document.createElement("li");
+    li.innerHTML=`<span class="mw-en"></span><span class="mw-tr"></span><span class="mw-meta" title="Farklı günlerde kaç kez karşına çıktı · en son ne zaman">${e[0]} kez · ${ago(d-e[1])}</span>`;
+    li.querySelector(".mw-en").textContent=OX[i]; li.querySelector(".mw-tr").textContent=OXTR[i]||"";
+    const ex=exampleFor(i); if(ex){const q=document.createElement("span"); q.className="mw-ex"; q.textContent=ex; li.append(q, listenBtn(ex,"y"))}
+    ul.append(li)});
+  box.append(ul);
+  if(ids.length>400) box.insertAdjacentHTML("beforeend",`<p class="muted">İlk 400 kelime gösteriliyor.</p>`);
+  $("#memClose").onclick=()=>{memOpen=null;renderMemList()};
+  box.hidden=false;
+}
+document.querySelectorAll(".mem-fig").forEach(b=>b.onclick=()=>{memOpen=memOpen===b.dataset.k?null:b.dataset.k; renderMemList(); if(memOpen) $("#memList").scrollIntoView({behavior:"smooth",block:"nearest"})});
 
 /* ---------- audio: recorded clips first, browser voice as fallback ---------- */
 function key(t){let h=5381;for(let i=0;i<t.length;i++)h=((h*33)^t.charCodeAt(i))>>>0;return h.toString(16)}
