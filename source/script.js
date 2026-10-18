@@ -16,14 +16,13 @@ const LEVELS = {
 };
 const PASS = 77;          // % of native speed needed for a line to count
 const GRACE = 0.7;        // seconds of reaction time not counted against the speaker
-const NEED = 3;           // finished dialogues at a level that open the next level
 const GAPS = [0,1,2,4,7,15,30]; // days before a word is due again, by number of days it was met
 const SETTLED = 4;        // met on this many different days = settled
 
 const $ = s => document.querySelector(s);
 /* progress lives in memory + localStorage, and is mirrored to the viewer's private account record (see "account sync") */
 const MEM = {};
-const SYNC_KEYS = ["lt.cat","lt.scen","lt.level","lt.unlocked","lt.prog","lt.seen","lt.mine","lt.stats","lt.where"];
+const SYNC_KEYS = ["lt.cat","lt.scen","lt.level","lt.unlocked","lt.prog","lt.seen","lt.mine","lt.stats","lt.where","lt.done","lt.reach"];
 const store = {
   get(k,d){if(k in MEM) return MEM[k]; try{const v=localStorage.getItem(k);return v?(MEM[k]=JSON.parse(v)):d}catch{return d}},
   put(k,v){MEM[k]=v; try{localStorage.setItem(k,JSON.stringify(v))}catch{}},
@@ -242,7 +241,40 @@ $("#stopTts").onclick=()=>{stopAudio();mark(-1)};
 /* ---------- levels ---------- */
 function progKey(id,lv,i){return `${id}:${lv}:${i}`}
 function dialogDone(s,lv){const p=store.get("lt.prog",{});return s.levels[lv].lines.every((_,i)=>(p[progKey(s.id,lv,i)]||0)>=PASS)}
-function doneCount(lv){return SCEN.filter(s=>dialogDone(s,lv)).length}
+/* ---------- learning path: one topic at a time, tabs open in order, social talk interleaved ----------
+   Work, technical and budget topics follow each other tab by tab; one social topic comes after every two of them.
+   A topic is complete when its dialogue, 4/3/2 and meeting are all done at that level. The next topic opens only then.
+   When the whole path is complete the next level opens and the path starts again from the first topic (spiral). */
+const STAGES=["work","tech","budget"];
+const PATH=(()=>{const main=STAGES.flatMap(c=>SCEN.filter(x=>x.cat===c)), soc=SCEN.filter(x=>x.cat==="social"), out=[]; let j=0;
+  main.forEach((x,i)=>{out.push(x); if(i%2===1&&j<soc.length) out.push(soc[j++])}); while(j<soc.length) out.push(soc[j++]); return out})();
+const STAGE_OF={}; {let st=STAGES[0]; PATH.forEach(x=>{if(STAGES.includes(x.cat)) st=x.cat; STAGE_OF[x.id]=st})}
+const PIDX=new Map(PATH.map((x,i)=>[x.id,i]));
+const tkey=(s,lv)=>s.id+":"+lv;
+function tasks(s,lv){const d=store.get("lt.done",{})[tkey(s,lv)]||{}; return {d:dialogDone(s,lv), r:!!d.r, m:!!d.m}}
+function topicDone(s,lv){const t=tasks(s,lv); return t.d&&t.r&&t.m}
+function firstOpen(lv){const k=PATH.findIndex(x=>!topicDone(x,lv)); return k<0?PATH.length-1:k}
+function reachOf(lv){const k=PATH.findIndex(x=>!topicDone(x,lv)); return Math.max(k<0?PATH.length-1:k, +(store.get("lt.reach",{})[lv]||0))}
+function isOpen(s,lv){return PIDX.get(s.id)<=reachOf(lv)}
+function doneCount(lv){return PATH.filter(x=>topicDone(x,lv)).length}
+function missing(s,lv){const t=tasks(s,lv), m=[]; if(!t.d) m.push("diyalog"); if(!t.r) m.push("4/3/2"); if(!t.m) m.push("toplantı"); return m}
+function joinTr(a){return a.length<2?a.join(""):a.slice(0,-1).join(", ")+" ve "+a.at(-1)}
+function markTask(f){
+  const all=store.get("lt.done",{}), k=tkey(cur,level), e=all[k]=all[k]||{}; if(e[f]) return; e[f]=1; store.set("lt.done",all);
+  afterProgress();
+}
+function afterProgress(){
+  renderScenList(); renderCats(); renderLevels();
+  if(topicDone(cur,level)&&!afterProgress.seen.has(tkey(cur,level))){
+    afterProgress.seen.add(tkey(cur,level));
+    const nx=PATH.find(x=>!topicDone(x,level));
+    const b=$("#banner"); b.textContent=nx?`"${cur.title}" tamamlandı. Sıradaki konu açıldı: ${nx.title}.`:`Bu seviyedeki tüm konular tamamlandı.`; b.hidden=false; setTimeout(()=>{b.hidden=true},9000);
+  }
+  if(level===unlocked&&unlocked<3&&doneCount(level)===PATH.length) setTimeout(unlockNext,900);
+}
+afterProgress.seen=new Set();
+// a stored topic that is not open at this level falls back to the next topic on the path
+function ensureOpen(){ if(!isOpen(cur,level)){cur=PATH[firstOpen(level)]; store.set("lt.scen",cur.id)} }
 function lineDone(){const p=store.get("lt.prog",{});return L().lines.filter((_,i)=>(p[progKey(cur.id,level,i)]||0)>=PASS).length}
 function renderLevels(){
   const row=$("#levelRow"); row.innerHTML="";
@@ -250,66 +282,77 @@ function renderLevels(){
     const b=document.createElement("button"); b.className="lvl"; b.id="lvl-"+n;
     b.setAttribute("aria-pressed", n===level); b.disabled = n>unlocked;
     const t=document.createElement("strong"); t.textContent=n+" · "+LEVELS[n].name;
-    const s=document.createElement("small"); s.textContent = n>unlocked ? "Kilitli" : LEVELS[n].note;
+    const s=document.createElement("small"); s.textContent = n>unlocked ? (n===unlocked+1?`Kilitli · ${unlocked}. seviyedeki ${PATH.length} konu bitince açılır`:`Kilitli · ${n-1}. seviye bitince açılır`) : LEVELS[n].note;
+    if(n>unlocked) b.classList.add("locked");
     b.append(t,s);
-    b.onclick=()=>{level=n;store.set("lt.level",n);renderAll();resetMeeting()};
+    b.onclick=()=>{level=n;store.set("lt.level",n);ensureOpen();renderAll();resetMeeting()};
     row.append(b);
   });
   const dc=doneCount(level);
-  $("#lvlProgress").textContent = level<unlocked
-    ? `Bu seviyeyi geçtin. Bu seviyede ${dc} diyaloğu doğal hızda tamamladın.`
-    : level===3 ? `En üst seviyedesin. ${dc} diyaloğu doğal hızda tamamladın.`
-    : `Bir sonraki seviye için bu seviyede ${NEED} diyaloğun tüm cümlelerini doğal hızın en az %${PASS}'si ile tekrar et: ${Math.min(dc,NEED)}/${NEED} diyalog`;
+  $("#lvlProgress").textContent = (level<unlocked||level===3)
+    ? `Bu seviyede ${dc}/${PATH.length} konu tamamlandı.`
+    : `${level+1}. seviye için: ${dc}/${PATH.length} konu tamamlandı (her konuda diyalog, 4/3/2 ve toplantı).`;
   $("#skipLvl").hidden = level!==unlocked || unlocked>=3;
 }
 function unlockNext(){
   if(unlocked>=3) return;
   unlocked++; store.set("lt.unlocked",unlocked);
   level=unlocked; store.set("lt.level",level);
-  renderAll(); resetMeeting();
+  ensureOpen(); renderAll(); resetMeeting();
   const b=$("#banner"); b.textContent=`Seviye ${level} · ${LEVELS[level].name} açıldı. Diyaloglar biraz daha uzun ve toplantı partneri de daha doğal konuşacak.`; b.hidden=false;
   setTimeout(()=>{b.hidden=true},9000);
 }
 $("#skipLvl").onclick=unlockNext;
 
 /* ---------- scenarios ---------- */
-function scenScore(s){
-  // due words count double: the suggested dialogue brings back words that are fading
-  const ws=new Set(s.levels[level].lines.flatMap(x=>x.w));
-  let due=0, fresh=0; ws.forEach(i=>{if(isDue(i))due++; else if(!SEEN[i])fresh++});
-  return dialogDone(s,level)? -1 : due*2+fresh;
-}
 function renderCats(){
   const row=$("#catRow"); row.innerHTML="";
   CATS.forEach(([id,name])=>{
-    const n=id==="all"?SCEN.length:SCEN.filter(s=>s.cat===id).length;
-    const b=document.createElement("button"); b.className="cat"; b.id="cat-"+id; b.setAttribute("aria-pressed",id===cat);
-    b.textContent=`${name} · ${n}`;
-    b.onclick=()=>{cat=id;store.set("lt.cat",id);renderCats();renderScenList()};
+    const n=tabList(id).length, open=tabOpen(id);
+    const b=document.createElement("button"); b.className="cat"+(open?"":" locked"); b.id="cat-"+id; b.setAttribute("aria-pressed",id===cat);
+    b.textContent=`${open?"":"🔒 "}${name} · ${n}`;
+    b.onclick=()=>{cat=id;store.set("lt.cat",id);renderCats();renderScenList(); if(!open) lockNote(`🔒 ${name} sekmesi henüz kilitli. Önceki sekmedeki konular bitince açılır. İstersen o sekmede "Bu sekme kolay, sonrakini aç"a basabilirsin.`)};
     row.append(b);
   });
 }
+// a stage tab lists its own topics with the social topics that fall between them, in path order
+function tabList(id){return id==="all"?PATH:id==="social"?PATH.filter(x=>x.cat==="social"):PATH.filter(x=>STAGE_OF[x.id]===id)}
+function tabOpen(id){return id==="all"||tabList(id).some(x=>isOpen(x,level))}
+function lockNote(t){const n=$("#lockMsg"); n.textContent=t; n.hidden=false; clearTimeout(lockNote.t); lockNote.t=setTimeout(()=>{n.hidden=true},8000)}
+function goTopic(s){cur=s;store.set("lt.scen",s.id);loadAudio(s.id);renderAll();resetMeeting()}
 function renderScenList(){
   const row=$("#scenRow"); row.innerHTML="";
-  const list=SCEN.filter(s=>cat==="all"||s.cat===cat);
-  let best=null,bs=-1; SCEN.forEach(s=>{const v=scenScore(s); if(v>bs){bs=v;best=s}});
-  list.forEach(s=>{
-    const b=document.createElement("button"); b.className="scen"; b.id="scen-"+s.id;
+  // next topic: the first unfinished open one in this tab (after a tab skip), otherwise the first unfinished on the path
+  const allDone=doneCount(level)===PATH.length, nx=tabList(cat).find(x=>isOpen(x,level)&&!topicDone(x,level))||PATH[firstOpen(level)];
+  tabList(cat).forEach(s=>{
+    const open=isOpen(s,level), done=topicDone(s,level);
+    const b=document.createElement("button"); b.className="scen"+(open?"":" locked"); b.id="scen-"+s.id;
     b.setAttribute("aria-pressed", s===cur);
-    const tag=document.createElement("span"); tag.className="tag"; tag.textContent=s.tag;
-    const st=document.createElement("strong"); st.textContent=s.title;
+    const tag=document.createElement("span"); tag.className="tag"; tag.textContent=(s.cat==="social"&&cat!=="social"?"SOHBET · ":"")+s.tag;
+    const st=document.createElement("strong"); st.textContent=(open?"":"🔒 ")+s.title;
     b.append(tag,st);
-    if(dialogDone(s,level)){const m=document.createElement("span");m.className="badge ok";m.textContent="✓ bu seviyede tamam";b.append(m)}
-    else if(s===best&&s!==cur){const m=document.createElement("span");m.className="badge";m.textContent="Sıradaki önerin";b.append(m)}
-    b.onclick=()=>{cur=s;store.set("lt.scen",s.id);loadAudio(s.id);renderAll();resetMeeting();$("#brief").scrollIntoView({behavior:"smooth",block:"start"})};
+    if(open){const t=tasks(s,level), d=document.createElement("div"); d.className="tasks";
+      [["Diyalog",t.d],["4/3/2",t.r],["Toplantı",t.m]].forEach(([n,o])=>{const x=document.createElement("span");x.className=o?"ok":"";x.textContent=(o?"✓ ":"○ ")+n;d.append(x)}); b.append(d)}
+    if(done){const m=document.createElement("span");m.className="badge ok";m.textContent="✓ tamamlandı";b.append(m)}
+    else if(open&&s===cur){const m=document.createElement("span");m.className="badge";m.textContent="Şu an burada";b.append(m)}
+    else if(open){const m=document.createElement("span");m.className="badge";m.textContent="Açık";b.append(m)}
+    b.onclick=()=>{
+      if(!open){lockNote(`🔒 "${s.title}" henüz kilitli. Önce "${nx.title}" konusunu bitir: ${joinTr(missing(nx,level))} eksik.`);return}
+      $("#lockMsg").hidden=true; goTopic(s); $("#brief").scrollIntoView({behavior:"smooth",block:"start"})};
     row.append(b);
   });
-  if(best&&best!==cur&&!list.includes(best)){
-    const n=$("#suggest"); n.hidden=false; n.textContent="";
-    const a=document.createElement("button"); a.className="linkish"; a.textContent=`Sıradaki önerin: ${best.title}`;
-    a.onclick=()=>{cat=best.cat;store.set("lt.cat",cat);cur=best;store.set("lt.scen",best.id);renderAll();resetMeeting()};
-    n.append(a);
-  } else $("#suggest").hidden=true;
+  const n=$("#suggest"); n.textContent=""; n.hidden=allDone;
+  if(!allDone){const a=document.createElement("button"); a.className="linkish";
+    a.textContent=nx===cur?`Şu anki konu: ${nx.title} · eksik: ${joinTr(missing(nx,level))}`:`Sıradaki konu: ${nx.title} · eksik: ${joinTr(missing(nx,level))}`;
+    a.onclick=()=>{cat=STAGE_OF[nx.id];store.set("lt.cat",cat);goTopic(nx);$("#brief").scrollIntoView({behavior:"smooth",block:"start"})};
+    n.append(a)}
+  // "this tab is easy": opens the next tab at this level without finishing the current one
+  const sk=$("#skipTab"), stI=STAGES.indexOf(cat), nextStage=STAGES[stI+1];
+  const canSkip=stI>=0&&nextStage&&tabOpen(cat)&&!tabOpen(nextStage);
+  sk.hidden=!canSkip;
+  if(canSkip) sk.onclick=()=>{const r=store.get("lt.reach",{}); r[level]=Math.max(+(r[level]||0),PIDX.get(tabList(nextStage)[0].id)); store.set("lt.reach",r);
+    cat=nextStage; store.set("lt.cat",cat); renderCats(); renderScenList();
+    const b=$("#banner"); b.textContent=`${CATS.find(c=>c[0]===nextStage)[1]} sekmesi açıldı.`; b.hidden=false; setTimeout(()=>{b.hidden=true},6000)};
 }
 function renderBrief(){
   $("#briefTxt").textContent=cur.brief; $("#briefRole").textContent=cur.role;
@@ -389,7 +432,7 @@ function renderShadow(){
       setChip(chip,pct); meet(x.w);
       const pr=store.get("lt.prog",{}); const k=progKey(cur.id,level,i); pr[k]=Math.max(pr[k]||0,pct); store.set("lt.prog",pr); statAdd("l",1);
       renderLevels(); $("#lineProg").textContent=`${lineDone()}/${L().lines.length} cümle doğal hızda`;
-      if(dialogDone(cur,level)){renderScenList(); if(level===unlocked&&unlocked<3&&doneCount(level)>=NEED) setTimeout(unlockNext,700)}
+      if(dialogDone(cur,level)) afterProgress();
     };
     r.append(b,mid,right); box.append(r);
   });
@@ -475,7 +518,7 @@ $("#startRound").onclick=()=>{
   },1000);
 };
 function stopRound(){clearInterval(timer);timer=null;try{rec&&rec.stop()}catch{}rec=null;$("#roundBar").hidden=true}
-function finishRound(){stopRound();roundIdx++;renderRounds();beep();statAdd("r",1);$(".timer").scrollIntoView({behavior:"smooth",block:"center"})}
+function finishRound(){stopRound();roundIdx++;renderRounds();beep();statAdd("r",1);if(roundIdx>=durations().length) markTask("r");$(".timer").scrollIntoView({behavior:"smooth",block:"center"})}
 $("#rbStop").onclick=finishRound;
 $("#resetRounds").onclick=()=>{stopRound();roundIdx=0;renderRounds()};
 function beep(){try{const a=new AudioContext(),o=a.createOscillator(),g=a.createGain();o.frequency.value=660;g.gain.value=.08;o.connect(g).connect(a.destination);o.start();o.stop(a.currentTime+.25)}catch{}}
@@ -566,6 +609,7 @@ $("#send").onclick=async()=>{
   $("#say").value=""; addMsg("me",text); meet(oxIn(text));
   warmNeural(); statAdd("t",1);
   turns.push({role:"user",content:text});
+  if(turns.filter(t=>t.role==="user").length>=6) markTask("m");   // a free meeting with Claude counts after six answers
   const pending=addMsg("them","Düşünüyor…");
   $("#send").disabled=true; $("#stopAi").hidden=false;
   ctl=new AbortController();
@@ -734,7 +778,7 @@ function applyRemote(d){
   cat=store.get("lt.cat","work"); cur=SCEN.find(s=>s.id===store.get("lt.scen"))||cur;
   unlocked=Math.min(3,Math.max(1,+store.get("lt.unlocked",1)||1)); level=Math.min(unlocked,+store.get("lt.level",1)||1);
   SEEN=store.get("lt.seen",{});
-  loadAudio(cur.id); renderAll(); renderMemory(); renderMine(); if(cur.id!==prevScen) resetMeeting();
+  ensureOpen(); loadAudio(cur.id); renderAll(); renderMemory(); renderMine(); if(cur.id!==prevScen) resetMeeting();
 }
 addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"&&ACC.ref){clearTimeout(ACC.timer);ACC.timer=null;pushSync()}});
 (async()=>{
@@ -798,6 +842,7 @@ function scriptSend(){
   sc.i++; setTimeout(()=>scriptAsk(false),400);
 }
 function scriptEnd(){
+  markTask("m");
   note(`Toplantı bitti. ${sc.asked} sorudan ${sc.good} tanesini örnek cevaba yakın verdin. "Toplantıyı yeniden başlat" ile tekrar edebilir ya da başka bir konu seçebilirsin.`);
 }
 $("#hintBtn").onclick=()=>{const pr=pairs()[sc.i]; if(meetMode==="script"&&pr) note("İpucu: "+pr[1].tr)};
@@ -861,4 +906,4 @@ function personalize(name){
   SCEN.forEach(walk); curName=name;
   try{ renderAll(); resetMeeting() }catch{}
 }
-loadAudio(cur.id); renderAll(); resetMeeting();
+ensureOpen(); loadAudio(cur.id); renderAll(); resetMeeting();
