@@ -344,7 +344,7 @@ details summary{cursor:pointer;font-weight:700}
           <button id="resetRounds">Sıfırla</button>
         </div>
         <p class="transcript" id="liveTx"></p>
-        <label for="txBox" class="muted" style="font-size:.9rem">Turlar sırasında konuştukların mikrofonla otomatik yazılır (Chrome ve Edge); son turun metni bu kutuya gelir. Olmazsa kutuya tıklayıp Windows'ta <b>Win + H</b> ile dikte et. Sonra "Daha doğal nasıl söylenir?"e bas:</label>
+        <label for="txBox" class="muted" style="font-size:.9rem">Tur başlayınca konuştukların mikrofonla bu kutuya canlı yazılır (Chrome ve Edge); her yeni tur kutuyu baştan doldurur. Olmazsa kutuya tıklayıp Windows'ta <b>Win + H</b> ile dikte et. Tur bitince "Daha doğal nasıl söylenir?"e bas:</label>
         <textarea id="txBox" placeholder="So, the main reason we want to move to RTM is..."></textarea>
         <div class="ctrls"><button id="txFeedback">Daha doğal nasıl söylenir?</button></div>
         <div id="txOut"></div>
@@ -853,8 +853,9 @@ function setPaceForLevel(){if(!timer){$("#pace").value=LEVELS[level].pace;roundI
 $("#pace").onchange=()=>{stopRound();roundIdx=0;renderRounds()};
 $("#startRound").onclick=()=>{
   const d=durations(); total=remain=d[roundIdx];
-  $("#startRound").disabled=true; $("#liveTx").textContent="";
-  rec=makeRec((f,i)=>{$("#liveTx").textContent=(f+i).trim(); if(roundIdx===d.length-1) $("#txBox").value=f.trim()}, ()=>{});
+  // each round's speech is written live into the box, replacing the previous round's text
+  $("#startRound").disabled=true; $("#liveTx").textContent=""; $("#liveTx").hidden=true; $("#txBox").value=""; $("#txOut").innerHTML="";
+  rec=makeRec((f,i)=>{const b=$("#txBox"); b.value=(f+i).trim(); b.scrollTop=b.scrollHeight}, ()=>{});
   try{rec&&rec.start()}catch{rec=null}
   timer=setInterval(()=>{remain--; $("#clock").textContent=fmt(Math.max(remain,0));
     $("#arc").style.strokeDashoffset=C*(1-remain/total);

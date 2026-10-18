@@ -431,8 +431,9 @@ function setPaceForLevel(){if(!timer){$("#pace").value=LEVELS[level].pace;roundI
 $("#pace").onchange=()=>{stopRound();roundIdx=0;renderRounds()};
 $("#startRound").onclick=()=>{
   const d=durations(); total=remain=d[roundIdx];
-  $("#startRound").disabled=true; $("#liveTx").textContent="";
-  rec=makeRec((f,i)=>{$("#liveTx").textContent=(f+i).trim(); if(roundIdx===d.length-1) $("#txBox").value=f.trim()}, ()=>{});
+  // each round's speech is written live into the box, replacing the previous round's text
+  $("#startRound").disabled=true; $("#liveTx").textContent=""; $("#liveTx").hidden=true; $("#txBox").value=""; $("#txOut").innerHTML="";
+  rec=makeRec((f,i)=>{const b=$("#txBox"); b.value=(f+i).trim(); b.scrollTop=b.scrollHeight}, ()=>{});
   try{rec&&rec.start()}catch{rec=null}
   timer=setInterval(()=>{remain--; $("#clock").textContent=fmt(Math.max(remain,0));
     $("#arc").style.strokeDashoffset=C*(1-remain/total);

@@ -58,7 +58,7 @@ body.gated{overflow:hidden}
 .acc-btns{display:flex;gap:8px}
 .resume{display:flex;''')
 # --- texts: the real microphone works here ---
-rep('''Son turda söylediklerini buraya konuşarak yazdır: kutuya tıkla, Windows'ta <b>Win + H</b>, Mac'te <b>Fn</b> tuşuna iki kez bas ve mikrofona konuş. Sonra "Daha doğal nasıl söylenir?"e bas:''','''Turlar sırasında konuştukların mikrofonla otomatik yazılır (Chrome ve Edge); son turun metni bu kutuya gelir. Olmazsa kutuya tıklayıp Windows'ta <b>Win + H</b> ile dikte et. Sonra "Daha doğal nasıl söylenir?"e bas:''')
+rep('''Son turda söylediklerini buraya konuşarak yazdır: kutuya tıkla, Windows'ta <b>Win + H</b>, Mac'te <b>Fn</b> tuşuna iki kez bas ve mikrofona konuş. Sonra "Daha doğal nasıl söylenir?"e bas:''','''Tur başlayınca konuştukların mikrofonla bu kutuya canlı yazılır (Chrome ve Edge); her yeni tur kutuyu baştan doldurur. Olmazsa kutuya tıklayıp Windows'ta <b>Win + H</b> ile dikte et. Tur bitince "Daha doğal nasıl söylenir?"e bas:''')
 rep('''placeholder="Mikrofonla konuşmak için kutuya tıkla, Windows'ta Win + H (Mac'te Fn iki kez) bas. İngilizce bulamadığın kelimeyi Türkçe söyleyebilirsin."''','''placeholder="Cevabını yaz ya da Konuş tuşuna basıp İngilizce söyle."''')
 rep('''    <div class="resume" id="resume" hidden>''','''    <details class="settings">
       <summary>İlerleme yedeği</summary>
