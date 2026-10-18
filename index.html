@@ -943,8 +943,9 @@ function resetMeeting(){
   addMsg("them",opener());
   turns.push({role:"assistant",content:opener()});
 }
-$("#newMeeting").onclick=()=>{resetMeeting(); if(meetMode==="script"){meetVoice=true; const pr=pairs()[0]; if(pr&&$("#speakBack").checked) play(pr[0].en,"t")}};
+$("#newMeeting").onclick=()=>{micOff(); resetMeeting(); if(meetMode==="script"){meetVoice=true; const pr=pairs()[0]; if(pr&&$("#speakBack").checked) play(pr[0].en,"t")}};
 $("#send").onclick=async()=>{
+  micOff();
   if(meetMode==="script") return scriptSend();
   const text=$("#say").value.trim(); if(!text||!sample) return;
   $("#say").value=""; addMsg("me",text); meet(oxIn(text));
@@ -977,6 +978,8 @@ $("#say").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlK
 
 /* mic button for the chat, shown only if recognition exists */
 let chatRec=null;
+// sending (or restarting) ends dictation, so the partner's spoken reply is never typed into the box
+function micOff(){ if(!chatRec) return; const r=chatRec; chatRec=null; r.onresult=null; r.onend=null; r.onerror=null; try{r.abort()}catch{} $("#mic").textContent="Konuş" }
 if(SR){$("#mic").hidden=false;
   $("#mic").onclick=()=>{
     if(chatRec){try{chatRec.stop()}catch{};return}
