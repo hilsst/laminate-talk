@@ -2,6 +2,8 @@
 const SB_URL="__SB_URL__", SB_KEY="__SB_KEY__";
 let sb=null, sbUser=null;
 const PROG_KEYS=SYNC_KEYS;
+// file backup is only for guests; a member's progress already lives in their account
+function backupBox(show){ const d=document.querySelector(".settings"); if(d) d.hidden=!show }
 function gate(show,tab){ $("#authGate").hidden=!show; document.body.classList.toggle("gated",!!show); if(show) authTab(tab||"in") }
 function authTab(t){ $("#authGate").dataset.tab=t; $("#tabIn").classList.toggle("on",t==="in"); $("#tabUp").classList.toggle("on",t==="up");
   $("#nameRow").hidden=t!=="up"; $("#authGo").textContent=t==="up"?"Üye ol":"Giriş yap"; $("#authMsg").textContent=""; $("#forgot").hidden=t!=="in"; $("#pw2Row").hidden=t!=="new";
@@ -18,7 +20,7 @@ function trErr(e){const m=String(e?.message||e||"");
   return "Bir sorun oldu: "+m }
 async function signedIn(u){
   sbUser=u; gate(false); try{localStorage.removeItem("lt.guest")}catch{}
-  $("#accName").textContent=u.user_metadata?.name||u.email; personalize(u.user_metadata?.name); $("#logoutBtn").hidden=false; $("#loginBtn").hidden=true;
+  $("#accName").textContent=u.user_metadata?.name||u.email; personalize(u.user_metadata?.name); $("#logoutBtn").hidden=false; $("#loginBtn").hidden=true; backupBox(false);
   const owner=store.get("lt.owner",null);
   if(owner&&owner!==u.id) wipeLocal();
   store.put("lt.owner",u.id);
