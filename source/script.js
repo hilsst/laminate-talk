@@ -521,7 +521,7 @@ function resetMeeting(){
   addMsg("them",opener());
   turns.push({role:"assistant",content:opener()});
 }
-$("#newMeeting").onclick=resetMeeting;
+$("#newMeeting").onclick=()=>{resetMeeting(); if(meetMode==="script"){meetVoice=true; const pr=pairs()[0]; if(pr&&$("#speakBack").checked) play(pr[0].en,"t")}};
 $("#send").onclick=async()=>{
   if(meetMode==="script") return scriptSend();
   const text=$("#say").value.trim(); if(!text||!sample) return;
@@ -701,7 +701,7 @@ addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"&
   const use=n=>window.claude?.use?.(n)?.catch?.(()=>null)??Promise.resolve(null);
   const [db,user]=await Promise.all([use("db"),use("user")]);
   const me=user?await user.me().catch(()=>null):null;
-  if(me){ const av=$("#accAvatar"); av.src=me.avatarUrl; av.hidden=false; $("#accName").textContent=me.name||"Hoş geldin"; }
+  if(me){ const av=$("#accAvatar"); av.src=me.avatarUrl; av.hidden=false; $("#accName").textContent=me.name||"Hoş geldin"; personalize(me.name); }
   if(!db||!me?.id){ accState("Giriş yapılmadığı için ilerleme sadece bu cihazda tutuluyor"); showResume(); return }
   ACC.ref=db.doc("data/users/"+me.id+"/progress"); accState("Hesabın yükleniyor…");
   try{
@@ -722,20 +722,22 @@ const NUMW={zero:"0",one:"1",two:"2",three:"3",four:"4",five:"5",six:"6",seven:"
 function stem(w){w=NUMW[w]||w; for(const x of ["ing","ed","es","s","ly"]) if(w.length>x.length+2&&w.endsWith(x)) return w.slice(0,-x.length); return w}
 function keyWords(t){return [...new Set((t.toLowerCase().replace(/[’']/g,"'").match(/[a-z0-9]+/g)||[]).filter(w=>!STOP.has(w)&&w.length>1).map(stem))]}
 function pairs(){const ls=L().lines,out=[]; for(let i=0;i<ls.length;i++) if(ls[i].s==="t"&&ls[i+1]?.s==="y") out.push([ls[i],ls[i+1]]); return out}
+// the opening question is not read aloud on page load or topic change, only once the meeting is actually in use
+let meetVoice=false;
 function scriptAsk(again){
   const pr=pairs()[sc.i]; if(!pr) return scriptEnd();
   addMsg("them",pr[0].en); if(again) note("Anlaşılmadı; aynı soruyu tekrar soruyor. Aşağıdaki örnek cevaba bakıp kendi cümlenle tekrar dene.");
-  if($("#speakBack").checked) play(pr[0].en,"t");
+  if($("#speakBack").checked&&meetVoice) play(pr[0].en,"t");
 }
 function note(t){const p=document.createElement("p");p.className="muted";p.style.fontSize=".85rem";p.textContent=t;$("#log").append(p);$("#log").scrollTop=$("#log").scrollHeight}
 function scriptReset(){
-  ctl?.abort(); $("#log").innerHTML=""; sc={i:0,good:0,asked:0,tries:0};
+  ctl?.abort(); $("#log").innerHTML=""; sc={i:0,good:0,asked:0,tries:0}; meetVoice=false;
   note("Senaryolu toplantı: karşındakinin sorularını kendi cümlelerinle cevapla. Takılırsan İpucu tuşu cevabın Türkçe fikrini gösterir.");
   scriptAsk(false);
 }
 function scriptSend(){
   const text=$("#say").value.trim(), pr=pairs()[sc.i]; if(!text||!pr) return;
-  $("#say").value=""; addMsg("me",text); meet(oxIn(text)); statAdd("t",1);
+  $("#say").value=""; addMsg("me",text); meet(oxIn(text)); statAdd("t",1); meetVoice=true;
   const key=keyWords(pr[1].en), got=new Set(keyWords(text)), hit=key.filter(w=>got.has(w));
   const score=key.length?hit.length/key.length:0, eng=(text.match(/[a-z]+/gi)||[]).length;
   const mine=[...document.querySelectorAll(".msg.me")].pop();
@@ -807,4 +809,16 @@ $("#voiceBtn").onclick=async()=>{
   if(!copied){const ta=$("#voiceText"); ta.hidden=false; ta.value=t; ta.select()}
 };
 renderModes();
+/* the dialogues are written for "Kemal"; a signed-in member hears and reads their own first name instead
+   (lines with a changed name have no recorded clip, so play() falls back to the in-page voice) */
+let curName="Kemal";
+function personalize(name){
+  name=String(name||"").trim().split(/\s+/)[0]||""; if(!/^[\p{L}'-]{2,20}$/u.test(name)) return;
+  name=name[0].toLocaleUpperCase("tr")+name.slice(1); if(name===curName) return;
+  const re=new RegExp("(?<!\\p{L})"+curName.replace(/[-']/g,"\\$&")+"(?!\\p{L})","gu");
+  const walk=o=>{ if(typeof o==="string") return o.replace(re,name); if(Array.isArray(o)){for(let i=0;i<o.length;i++) o[i]=walk(o[i]); return o}
+    if(o&&typeof o==="object"){for(const k in o) o[k]=walk(o[k]); return o} return o };
+  SCEN.forEach(walk); curName=name;
+  try{ renderAll(); resetMeeting() }catch{}
+}
 loadAudio(cur.id); renderAll(); resetMeeting();

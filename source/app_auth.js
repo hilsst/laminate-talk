@@ -18,7 +18,7 @@ function trErr(e){const m=String(e?.message||e||"");
   return "Bir sorun oldu: "+m }
 async function signedIn(u){
   sbUser=u; gate(false); try{localStorage.removeItem("lt.guest")}catch{}
-  $("#accName").textContent=u.user_metadata?.name||u.email; $("#logoutBtn").hidden=false; $("#loginBtn").hidden=true;
+  $("#accName").textContent=u.user_metadata?.name||u.email; personalize(u.user_metadata?.name); $("#logoutBtn").hidden=false; $("#loginBtn").hidden=true;
   const owner=store.get("lt.owner",null);
   if(owner&&owner!==u.id) wipeLocal();
   store.put("lt.owner",u.id);
