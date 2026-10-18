@@ -1210,7 +1210,7 @@ $("#voiceBtn").onclick=async()=>{
 renderModes();
 loadAudio(cur.id); renderAll(); resetMeeting();
 /* ---------- membership (Supabase): sign up / sign in, progress kept in the member's account ---------- */
-const SB_URL="", SB_KEY="";
+const SB_URL="https://dkpdkzkmgazqlxscqvpq.supabase.co", SB_KEY="sb_publishable_h1K9E3rVED3lkM6U2KtQ3A_4Cq3BNHV";
 let sb=null, sbUser=null;
 const PROG_KEYS=SYNC_KEYS;
 function gate(show,tab){ $("#authGate").hidden=!show; document.body.classList.toggle("gated",!!show); if(show) authTab(tab||"in") }
