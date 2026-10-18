@@ -1,8 +1,8 @@
 // Laminate Talk offline cache. Page: network first (updates arrive), everything else: cache first.
-const VER = "lt-c3e9363fb7";
+const VER = "lt-2d753950f6";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png",
   "ort/ort.min.js", "ort/ort-wasm-simd.wasm", "tts/phonemizer.js", "tts/voice.json", "tts/voice0.wasm", "tts/voice1.wasm",
-  "audio/common.json", "vendor/anthropic-sdk.mjs"];
+  "audio/common.json"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(VER).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });

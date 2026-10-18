@@ -93,10 +93,14 @@ header{display:flex;flex-direction:column;gap:10px}
 .acc-state{font-size:.8rem;color:var(--muted)}
 .acc-state.ok::before{content:"✓ ";color:var(--accent)}
 .acc-state.warn{color:var(--warn)}
+.mode-row{display:flex;flex-wrap:wrap;gap:8px}
+.mode{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px}
+.mode.on{border-color:var(--accent);background:var(--accent-soft);font-weight:700}
+.mode.voice{margin-left:auto;border-color:var(--resin);color:var(--resin)}
+@media (max-width:720px){.mode.voice{margin-left:0}}
 .settings{flex:1 1 100%;order:3}
 .settings summary{cursor:pointer;font-size:.88rem;color:var(--muted)}
 .set-body{display:flex;flex-direction:column;gap:8px;padding-top:8px}
-.set-body input[type=password]{flex:1 1 220px;min-width:0}
 .btnlike{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:6px;padding:8px 14px;cursor:pointer;background:var(--surface)}
 .resume{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1 1 320px;justify-content:flex-end}
 .resume span{font-size:.88rem}
@@ -226,11 +230,8 @@ details summary{cursor:pointer;font-weight:700}
     <img id="accAvatar" alt="" hidden>
     <div class="acc-who"><b id="accName">Laminate Talk</b><span class="acc-state" id="accState">Hesap kontrol ediliyor…</span></div>
     <details class="settings">
-      <summary>Ayarlar ve yedek</summary>
+      <summary>İlerleme yedeği</summary>
       <div class="set-body">
-        <label for="apiKeyIn">Claude API anahtarı (toplantı partneri, doğal hali ve kelime bulma için)</label>
-        <div class="ctrls"><input type="password" id="apiKeyIn" placeholder="sk-ant-..." autocomplete="off"><button id="apiKeySave">Kaydet</button><button id="apiKeyDel">Sil</button></div>
-        <p class="muted" style="font-size:.8rem">Anahtar sadece bu cihazda saklanır ve doğrudan Anthropic'e gönderilir. Kullanım ücreti bu anahtarın hesabından düşer. Anahtarı console.anthropic.com adresinden alabilirsin.</p>
         <div class="ctrls"><button id="bkOut">İlerlemeyi yedekle (dosya)</button><label class="btnlike" for="bkIn">Yedeği yükle</label><input type="file" id="bkIn" accept="application/json,.json" hidden></div>
         <p class="muted" style="font-size:.8rem">Telefondan bilgisayara geçerken: bir cihazda yedekle, dosyayı diğer cihaza gönder ve orada yükle.</p>
       </div>
@@ -324,16 +325,24 @@ details summary{cursor:pointer;font-weight:700}
 
   <section class="station">
     <div class="st-head"><span class="st-num">03</span><h2>Toplantı simülasyonu</h2></div>
-    <p class="why">Claude bir meslektaş rolünde sana sorular sorar. Cevabını yaz ya da dikte et. Her cevaptan sonra söylediğinin doğal hali gösterilir, ama konuşma hiç durmaz.</p>
+    <div class="mode-row" role="group" aria-label="Toplantı türü">
+      <button class="mode on" id="modeScript">Senaryolu toplantı</button>
+      <button class="mode" id="modeClaude" hidden>Claude ile serbest</button>
+      <button class="mode voice" id="voiceBtn">Claude uygulamasında sesli konuş</button>
+    </div>
+    <p class="why" id="meetWhy"></p>
+    <p class="notice" id="voiceNote" hidden></p>
+    <textarea id="voiceText" hidden readonly style="min-height:120px"></textarea>
     <div class="chat">
       <div class="log" id="log"></div>
       <div class="compose">
-        <p class="notice" id="aiOff" hidden>Konuşma partneri için en üstteki "Ayarlar"dan Claude API anahtarını gir. Anahtar olmadan 1. ve 2. istasyonlar ve ifade sözlüğü yine çalışır.</p>
-        <textarea id="say" placeholder="Cevabını yaz ya da Konuş tuşuna basıp söyle. İngilizce bulamadığın kelimeyi Türkçe söyleyebilirsin."></textarea>
+        
+        <textarea id="say" placeholder="Cevabını yaz ya da Konuş tuşuna basıp İngilizce söyle."></textarea>
         <div class="ctrls">
           <div class="ctrls">
             <button class="primary" id="send">Gönder</button>
             <button id="mic" hidden>Konuş</button>
+            <button id="hintBtn">İpucu</button>
             <label for="speakBack"><input type="checkbox" id="speakBack" checked> Cevabı sesli oku</label>
           </div>
           <div class="ctrls">
@@ -809,46 +818,13 @@ function beep(){try{const a=new AudioContext(),o=a.createOscillator(),g=a.create
 
 /* ---------- Claude ---------- */
 let sample=null;
-/* The app calls the Claude API directly from the browser with the learner's own key (kept only on this device). */
-const SDK_URL=new URL("vendor/anthropic-sdk.mjs",location.href).href; // @anthropic-ai/sdk 0.131.0, bundled
-const MODEL="claude-opus-5-5";
-let sdkP=null;
-function apiKey(){try{return localStorage.getItem("lt.apikey")||""}catch{return ""}}
-function makeSample(){
-  if(!apiKey()) return null;
-  return {async json(input,opts={}){
-    sdkP=sdkP||import(SDK_URL);
-    const {default:Anthropic}=await sdkP;
-    const client=new Anthropic({apiKey:apiKey(),dangerouslyAllowBrowser:true});
-    const messages=typeof input==="string"?[{role:"user",content:input}]:input;
-    let r;
-    try{
-      r=await client.beta.messages.create({model:MODEL,max_tokens:4000,output_config:{effort:"low"},
-        betas:["server-side-fallback-2026-07-01"],fallbacks:"default",messages},{signal:opts.signal});
-    }catch(e){
-      if(e instanceof Anthropic.AuthenticationError) throw {code:"bad_key"};
-      if(e instanceof Anthropic.RateLimitError) throw {code:"rate_limited"};
-      if(e instanceof Anthropic.APIUserAbortError) throw {code:"aborted"};
-      if(e instanceof Anthropic.APIConnectionError) throw {code:"offline"};
-      throw {code:"api_error",message:e?.message};
-    }
-    if(r.stop_reason==="refusal") throw {code:"refusal"};
-    const text=r.content.filter(b=>b.type==="text").map(b=>b.text).join("");
-    const m=text.match(/\{[\s\S]*\}/); if(!m) throw {code:"invalid_json"};
-    try{return JSON.parse(m[0])}catch{throw {code:"invalid_json"}}
-  }};
-}
-const aiReady=(async()=>{sample=makeSample(); if(!sample) aiOff(); return sample})();
-function aiOff(){$("#aiOff").hidden=false;$("#send").disabled=true;$("#txFeedback").disabled=true;$("#say").disabled=true}
+const aiReady = Promise.resolve(null).then(()=>{aiOff();return null});
+/* without Claude the meeting runs as a scripted meeting and 4/3/2 shows the model talk instead of a rewrite */
+function aiOff(){ $("#modeClaude").hidden=true; if(meetMode!=="script"){meetMode="script";renderModes();resetMeeting()} $("#txFeedback").textContent="Örnek anlatımı göster"; $("#txFeedback").disabled=false }
 function errCopy(e){
   const c=e?.code;
   if(["not_granted","sampling_disabled","not_declared","capability_disabled","capability_removed"].includes(c)){aiOff();return "Bu sayfanın Claude'u kullanmasına izin verilmedi, bu yüzden partner kapalı."}
   if(c==="rate_limited") return "Çok sık istek gitti. Biraz bekleyip tekrar gönder.";
-  if(c==="bad_key") return "API anahtarı kabul edilmedi. Ayarlar'dan anahtarı kontrol et.";
-  if(c==="offline") return "İnternet bağlantısı yok. Bağlanınca tekrar gönder.";
-  if(c==="refusal") return "Claude bu mesaja cevap vermedi. Başka bir şekilde yaz.";
-  if(c==="aborted") return "Durduruldu.";
-  if(c==="api_error") return "Claude'a ulaşılamadı: "+(e.message||"bilinmeyen hata");
   if(c==="session_expired") return "Oturum süresi dolmuş. claude.ai'ye yeniden giriş yapıp tekrar dene.";
   if(c==="invalid_json"||c==="empty_completion") return "Cevap okunamadı. Tekrar gönder.";
   if(c==="cancelled") return "";
@@ -912,12 +888,14 @@ function addMsg(who,text){
   $("#log").append(m); $("#log").scrollTop=$("#log").scrollHeight; return b;
 }
 function resetMeeting(){
+  if(meetMode==="script") return scriptReset();
   ctl?.abort(); turns=[]; $("#log").innerHTML=""; pickTargets();
   addMsg("them",opener());
   turns.push({role:"assistant",content:opener()});
 }
 $("#newMeeting").onclick=resetMeeting;
 $("#send").onclick=async()=>{
+  if(meetMode==="script") return scriptSend();
   const text=$("#say").value.trim(); if(!text||!sample) return;
   $("#say").value=""; addMsg("me",text); meet(oxIn(text));
   warmNeural(); statAdd("t",1);
@@ -964,7 +942,8 @@ if(SR){$("#mic").hidden=false;
 
 /* 4/3/2 feedback */
 $("#txFeedback").onclick=async()=>{
-  const t=$("#txBox").value.trim(); if(!t||!sample) return;
+  if(!sample) return modelTalk();
+  const t=$("#txBox").value.trim(); if(!t) return;
   const out=$("#txOut"); out.innerHTML='<p class="muted">Düşünüyor…</p>'; $("#txFeedback").disabled=true;
   meet(oxIn(t));
   const due=dueWords(5).map(i=>OX[i]);
@@ -1087,7 +1066,6 @@ function applyRemote(d){
   SEEN=store.get("lt.seen",{});
   loadAudio(cur.id); renderAll(); renderMemory(); renderMine(); if(cur.id!==prevScen) resetMeeting();
 }
-loadAudio(cur.id); renderAll(); resetMeeting();
 addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"&&ACC.ref){clearTimeout(ACC.timer);ACC.timer=null;pushSync()}});
 (async()=>{
   const use=n=>window.claude?.use?.(n)?.catch?.(()=>null)??Promise.resolve(null);
@@ -1107,12 +1085,101 @@ addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"&
     if(d.device!==DEVICE&&(d.updatedAt||0)>+store.get("lt.updatedAt",0)) applyRemote(d) },()=>{});
 })();
 
+/* ---------- scripted meeting: the partner asks the dialogue's questions, the learner answers freely ---------- */
+let meetMode="script", sc={i:0,good:0,asked:0};
+const STOP=new Set("a an the i you we he she it they me us him her them my our your their its is are was were be been am do does did to of in on at for with and or but so if that this these those there here as by from about into than then can could will would should shall may might must have has had not no yes just very also too oh well ok okay".split(" "));
+const NUMW={zero:"0",one:"1",two:"2",three:"3",four:"4",five:"5",six:"6",seven:"7",eight:"8",nine:"9",ten:"10",twelve:"12",fifteen:"15",twenty:"20",thirty:"30",fifty:"50",hundred:"100",thousand:"1000"};
+function stem(w){w=NUMW[w]||w; for(const x of ["ing","ed","es","s","ly"]) if(w.length>x.length+2&&w.endsWith(x)) return w.slice(0,-x.length); return w}
+function keyWords(t){return [...new Set((t.toLowerCase().replace(/[’']/g,"'").match(/[a-z0-9]+/g)||[]).filter(w=>!STOP.has(w)&&w.length>1).map(stem))]}
+function pairs(){const ls=L().lines,out=[]; for(let i=0;i<ls.length;i++) if(ls[i].s==="t"&&ls[i+1]?.s==="y") out.push([ls[i],ls[i+1]]); return out}
+function scriptAsk(again){
+  const pr=pairs()[sc.i]; if(!pr) return scriptEnd();
+  addMsg("them",pr[0].en); if(again) note("Anlaşılmadı; aynı soruyu tekrar soruyor. Aşağıdaki örnek cevaba bakıp kendi cümlenle tekrar dene.");
+  if($("#speakBack").checked) play(pr[0].en,"t");
+}
+function note(t){const p=document.createElement("p");p.className="muted";p.style.fontSize=".85rem";p.textContent=t;$("#log").append(p);$("#log").scrollTop=$("#log").scrollHeight}
+function scriptReset(){
+  ctl?.abort(); $("#log").innerHTML=""; sc={i:0,good:0,asked:0,tries:0};
+  note("Senaryolu toplantı: karşındakinin sorularını kendi cümlelerinle cevapla. Takılırsan İpucu tuşu cevabın Türkçe fikrini gösterir.");
+  scriptAsk(false);
+}
+function scriptSend(){
+  const text=$("#say").value.trim(), pr=pairs()[sc.i]; if(!text||!pr) return;
+  $("#say").value=""; addMsg("me",text); meet(oxIn(text)); statAdd("t",1);
+  const key=keyWords(pr[1].en), got=new Set(keyWords(text)), hit=key.filter(w=>got.has(w));
+  const score=key.length?hit.length/key.length:0, eng=(text.match(/[a-z]+/gi)||[]).length;
+  const mine=[...document.querySelectorAll(".msg.me")].pop();
+  if(score<0.2&&!(eng>=5&&hit.length>=1)){
+    sc.tries++;
+    mine.append(suggestBox(pr[1].en));
+    if(sc.tries>=2){sc.tries=0;sc.i++;sc.asked++;note("Sorun değil, sıradaki soruya geçiyoruz.");return scriptAsk(false)}
+    return scriptAsk(true);
+  }
+  sc.tries=0; sc.asked++; if(score>=0.45) sc.good++;
+  const box=document.createElement("div");box.className="recast";
+  const b=document.createElement("b");b.textContent=score>=0.45?"Güzel. Örnek cevap":"Anlaşıldı. Daha doğal hali";
+  const sp=document.createElement("span");sp.textContent=pr[1].en;
+  box.append(b,sp,document.createElement("br"),listenBtn(pr[1].en,"y"));
+  const miss=key.filter(w=>!got.has(w)).slice(0,6);
+  if(miss.length&&score<0.8){const m=document.createElement("small");m.className="muted";m.style.display="block";m.textContent="Örnekte olup seninkinde olmayan kelimeler: "+miss.join(", ");box.append(m)}
+  mine.append(box); meet(pr[1].w||[]);
+  sc.i++; setTimeout(()=>scriptAsk(false),400);
+}
+function scriptEnd(){
+  note(`Toplantı bitti. ${sc.asked} sorudan ${sc.good} tanesini örnek cevaba yakın verdin. "Toplantıyı yeniden başlat" ile tekrar edebilir ya da başka bir konu seçebilirsin.`);
+}
+$("#hintBtn").onclick=()=>{const pr=pairs()[sc.i]; if(meetMode==="script"&&pr) note("İpucu: "+pr[1].tr)};
+function renderModes(){
+  $("#modeScript").classList.toggle("on",meetMode==="script"); $("#modeClaude").classList.toggle("on",meetMode==="claude");
+  $("#hintBtn").hidden=meetMode!=="script";
+  $("#meetWhy").textContent=meetMode==="script"
+    ?"Karşındaki bu konunun sorularını sırayla sorar. Cevabını yaz ya da Konuş tuşuyla söyle. Her cevaptan sonra örnek cevabı ve eksik kalan kelimeleri görürsün. Anlaşılmayan cevapta aynı soru tekrar sorulur."
+    :"Claude bir meslektaş rolünde sana serbest sorular sorar. Her cevaptan sonra söylediğinin doğal hali gösterilir, ama konuşma hiç durmaz.";
+}
+$("#modeScript").onclick=()=>{meetMode="script";renderModes();resetMeeting()};
+$("#modeClaude").onclick=()=>{if(!sample) return; meetMode="claude";renderModes();resetMeeting()};
+aiReady.then(sm=>{ if(sm) $("#modeClaude").hidden=false });
+/* 4/3/2 without Claude: the level's dialogue answers read as one model talk */
+async function modelTalk(){
+  const out=$("#txOut"); out.innerHTML="";
+  const ys=L().lines.filter(x=>x.s==="y"), box=document.createElement("div"); box.className="recast";
+  const b=document.createElement("b"); b.textContent="Örnek anlatım"; const sp=document.createElement("span"); sp.textContent=ys.map(x=>x.en).join(" ");
+  const btn=document.createElement("button"); btn.className="mini"; btn.textContent="Dinle";
+  btn.onclick=async()=>{for(const y of ys){const r=await play(y.en,"y"); if(r==null) break}};
+  box.append(b,sp,document.createElement("br"),btn); out.append(box);
+  if($("#txBox").value.trim()) meet(oxIn($("#txBox").value));
+}
+
+/* ---------- practise the same meeting by voice in the Claude app (uses the person's own Claude plan) ---------- */
+function voicePrompt(){
+  const words=targets.slice(0,10).map(i=>OX[i]).join(", ");
+  return `Let's do an English speaking practice in voice mode. I am a Turkish mechanical engineer who specialises in composite materials; I want to become fluent in work meetings without grammar lessons.
+
+Role-play this situation with me. Situation (in Turkish): ${cur.brief}
+You play: ${cur.role}.
+My level: ${LEVELS[level].name}. ${LEVELS[level].style}
+
+Rules:
+- Speak only English. Keep each turn short (1-3 sentences), like a real meeting, then ask me one question.
+- When my answer has mistakes or sounds unnatural, first say "You could say:" and the natural version in one sentence, then continue the meeting. Never explain grammar.
+- If I don't understand, say it again more simply.
+- Naturally use some of these words during the conversation: ${words}.
+- After about 10 exchanges, end the meeting and give me 3 useful phrases I should reuse.
+
+Start now with your first line: "${opener()}"`;
+}
+$("#voiceBtn").onclick=async()=>{
+  const t=voicePrompt(); let copied=false;
+  try{await navigator.clipboard.writeText(t);copied=true}catch{}
+  const a=document.createElement("a"); a.href="https://claude.ai/new?q="+encodeURIComponent(t); a.target="_blank"; a.rel="noopener"; document.body.append(a); a.click(); a.remove();
+  $("#voiceNote").hidden=false;
+  $("#voiceNote").textContent=(copied?"Talimat panoya kopyalandı ve Claude açılıyor. ":"Claude açılıyor. ")+"Mesajı gönder, sonra Claude'da ses moduna geç ve konuşarak devam et. Claude açılmazsa Claude uygulamasını aç ve talimatı yapıştır.";
+  if(!copied){const ta=$("#voiceText"); ta.hidden=false; ta.value=t; ta.select()}
+};
+renderModes();
+loadAudio(cur.id); renderAll(); resetMeeting();
+
 /* ---------- app shell: settings, backup, offline ---------- */
-$("#apiKeyIn").value=apiKey()?"••••••••":"";
-$("#apiKeySave").onclick=()=>{const v=$("#apiKeyIn").value.trim(); if(!v||v.startsWith("•")) return;
-  try{localStorage.setItem("lt.apikey",v)}catch{} sample=makeSample(); $("#apiKeyIn").value="••••••••";
-  $("#aiOff").hidden=true; $("#send").disabled=false; $("#say").disabled=false; $("#txFeedback").disabled=false; accState("API anahtarı kaydedildi","ok")};
-$("#apiKeyDel").onclick=()=>{try{localStorage.removeItem("lt.apikey")}catch{} sample=null; $("#apiKeyIn").value=""; aiOff()};
 $("#bkOut").onclick=()=>{const kv={}; SYNC_KEYS.forEach(k=>{const v=store.get(k,undefined); if(v!==undefined) kv[k]=v});
   const blob=new Blob([JSON.stringify({app:"laminate-talk",v:1,updatedAt:+store.get("lt.updatedAt",Date.now()),kv})],{type:"application/json"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="laminate-talk-yedek-"+dayKey()+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),5000)};
