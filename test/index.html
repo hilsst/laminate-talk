@@ -85,6 +85,7 @@ header{display:flex;flex-direction:column;gap:10px}
 .plan ol{margin:0 0 10px;padding-left:20px;font-size:.92rem}
 .plan ol li{margin:3px 0}
 .plan .kit{gap:5px}
+.plan .kit-label{margin:10px 0 4px;font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .plan .chunk.has-ex{display:block;width:100%;text-align:left;border-style:solid}
 .plan .chunk .ex{display:block;font-style:italic;font-size:.88rem;margin-top:3px;color:var(--ink)}
 .plan .chunk .ex-tr{display:block;font-size:.8rem;color:var(--muted);margin-top:2px}
@@ -893,18 +894,23 @@ function planKit(list){
 function renderPlan(){
   const box=$("#plan"); if(!box) return; box.innerHTML="";
   const F=FRAMES[level]||FRAMES[1], ideas=(L().ideas&&L().ideas.length)?L().ideas:L().lines.filter(x=>x.s==="y").map(x=>x.tr).filter(Boolean);
+  // kit: one list of phrases, or groups [[label, list], ...] shown one after another under small headings
   const step=(title,hint,kit,extra,focus)=>{const d=document.createElement("div");d.className="step";
     const h=document.createElement("h3");h.textContent=title;const p=document.createElement("p");p.className="hint";p.textContent=hint;
-    d.append(h,p);if(extra)d.append(extra);const k=planKit(kit);
-    if(focus) k.querySelectorAll(".chunk").forEach(b=>{if(b.firstChild.textContent===focus){b.classList.add("focus");k.prepend(b)}});
-    d.append(k);box.append(d)};
-  const split=ideas.length>=4, first=split?ideas[0]:"Konuyu ve ana mesajı tek cümleyle söyle. Konu: "+eT(cur)+".", last=split?ideas[ideas.length-1]:"Özetle ve sıradaki adımı söyle.", mid=split?ideas.slice(1,-1):ideas;
+    d.append(h,p);if(extra)d.append(extra);
+    (typeof kit[0][0]==="string"&&Array.isArray(kit[0][1])?kit:[[null,kit]]).forEach(([label,list])=>{
+      if(label){const l=document.createElement("p");l.className="kit-label";l.textContent=label;d.append(l)}
+      const k=planKit(list);
+      if(focus) k.querySelectorAll(".chunk").forEach(b=>{if(b.firstChild.textContent===focus){b.classList.add("focus");k.prepend(b)}});
+      d.append(k)});
+    box.append(d)};
   const dot=t=>/[.!?:]$/.test(t)?t:t+".";
   const r=Math.min(roundIdx,2), o=F.open[r%F.open.length], c=F.close[r%F.close.length];
-  step("1 · Başla · ilk 20 sn",dot(first)+" Bu turda şu kalıpla başla:",F.open,null,o[0]);
-  const ol=document.createElement("ol"); mid.forEach(t=>{const li=document.createElement("li");li.textContent=t;ol.append(li)});
-  step("2 · Sırayla anlat","Bu noktaları sırayla, kendi İngilizcenle anlat. Bağlayıcılar ve konu ifadeleri aşağıda.",[...F.go,...L().chunks],ol);
-  step("3 · Bitir · son 20 sn","Özetle, sonra "+last.charAt(0).toLocaleLowerCase("tr")+dot(last.slice(1))+" Bu turda şu kalıpla bitir:",F.close,null,c[0]);
+  step("1 · Başla · ilk 20 sn",(ideas.length?"Listedeki 1. noktayla başla: "+dot(ideas[0])+" ":"Konuyu ve ana mesajı tek cümleyle söyle. ")+"Bu turda şu kalıpla başla:",F.open,null,o[0]);
+  // the whole speaking order, in the order of the dialogue, as a reminder while talking
+  const ol=document.createElement("ol"); ideas.forEach(t=>{const li=document.createElement("li");li.textContent=t;ol.append(li)});
+  step("2 · Sırayla anlat","Bu noktaları sırayla, kendi İngilizcenle anlat.",[["Diyalogdaki ifadeler",L().chunks],["Alternatif bağlayıcılar",F.go]],ol);
+  step("3 · Bitir · son 20 sn","Son noktadan sonra kısa bir özet yap. Bu turda şu kalıpla bitir:",F.close,null,c[0]);
   $("#txBox").placeholder=o[0];
 }
 
