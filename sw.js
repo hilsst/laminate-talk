@@ -1,5 +1,5 @@
 // Laminate Talk offline cache. Page: network first (updates arrive), everything else: cache first.
-const VER = "lt-76cbc06f17";
+const VER = "lt-0b595ced0d";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png",
   "ort/ort.min.js", "ort/ort-wasm-simd.wasm", "tts/phonemizer.js", "tts/voice.json", "tts/voice0.wasm", "tts/voice1.wasm",
   "audio/common.json", "vendor/supabase.mjs"];
